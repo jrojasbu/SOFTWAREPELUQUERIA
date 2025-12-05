@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión Peluquería Magical Hair Premium</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <div class="background-blobs">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <div class="container">
+        <header>
+            <img src="{{ url_for('static', filename='Magical_Hair.png') }}" alt="Magical Hair Logo" class="logo">
+            <h1>Gestión Peluquería Magical Hair</h1>
+            <p>Panel de Control Diario</p>
+            <a href="/logout" class="logout-btn"
+                style="position: absolute; top: 20px; right: 20px; background: #dc3545; color: white; padding: 0.5rem 1rem; text-decoration: none; border-radius: 8px; font-weight: 500;">Cerrar
+                Sesión</a>
+        </header>
+
+        <div class="sede-selector-container">
+            <label for="sedeSelector">Sede:</label>
+            <div class="select-wrapper">
+                <select id="sedeSelector" class="sede-selector" onchange="changeSede()">
+                    {% for sede in sedes %}
+                    <option value="{{ sede }}">{{ sede }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <nav class="tabs">
+            <button class="tab-btn active" onclick="openTab('services')">Servicios</button>
+            <button class="tab-btn" onclick="openTab('products')">Productos</button>
+            <button class="tab-btn" onclick="openTab('expenses')">Gastos</button>
+            <button class="tab-btn" onclick="openTab('agenda')">Agenda</button>
+            <button class="tab-btn" onclick="openTab('inventory')">Inventario</button>
+            <button class="tab-btn" onclick="openTab('summary')">Resumen</button>
+            <button class="tab-btn" onclick="openTab('statistics')">Estadísticas</button>
+            <button class="tab-btn" onclick="openTab('monthly-expenses')">Gastos Fijos</button>
+            <button class="tab-btn" onclick="openTab('config')">Configuración</button>
+        </nav>
+
+        <main>
+            <!-- Servicios Section -->
+            <section id="services" class="tab-content active">
+                <h2>Registrar Servicio</h2>
+                <form id="serviceForm">
+                    <div class="input-group">
+                        <label>Estilista</label>
+                        <select name="estilista" required>
+                            <option value="" disabled selected>Seleccione un estilista</option>
+                            {% for stylist in stylists %}
+                            <option value="{{ stylist }}">{{ stylist }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Servicio</label>
+                        <select name="servicio" required>
+                            <option value="" disabled selected>Seleccione un servicio</option>
+                            {% for service in services %}
+                            <option value="{{ service }}">{{ service }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Valor ($)</label>
+                        <input type="number" name="valor" placeholder="0.00" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Método de Pago</label>
+                        <select name="metodo_pago" required>
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Tarjeta">Tarjeta</option>
+                            <option value="NEQUI">NEQUI</option>
+                            <option value="Daviplata">Daviplata</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="submit-btn">Registrar Servicio</button>
+                </form>
+            </section>
+
+            <!-- Agenda Section -->
+            <section id="agenda" class="tab-content">
+                <h2>Agenda de Citas</h2>
+                <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 300px;">
+                        <h3>Agendar Nueva Cita</h3>
+                        <form id="appointmentForm">
+                            <div class="input-group">
+                                <label>Fecha</label>
+                                <input type="date" name="fecha" required>
+                            </div>
+                            <div class="input-group">
+                                <label>Hora</label>
+                                <input type="time" name="hora" required>
+                            </div>
+                            <div class="input-group">
+                                <label>Nombre del Cliente</label>
+                                <input type="text" name="cliente" placeholder="Nombre completo" required>
+                            </div>
+                            <div class="input-group">
+                                <label>Teléfono Celular</label>
+                                <input type="tel" name="telefono" placeholder="Número de contacto" required>
+                            </div>
+                            <div class="input-group">
+                                <label>Servicio</label>
+                                <select name="servicio" required>
+                                    <option value="" disabled selected>Seleccione un servicio</option>
+                                    {% for service in services %}
+                                    <option value="{{ service }}">{{ service }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label>Notas (Opcional)</label>
+                                <textarea name="notas" placeholder="Detalles adicionales..." rows="3"></textarea>
+                            </div>
+                            <button type="submit" class="submit-btn">Agendar Cita</button>
+                        </form>
+                    </div>
+
+                    <div style="flex: 1.5; min-width: 400px;">
+                        <h3>Citas Programadas</h3>
+                        <div class="input-group" style="margin-bottom: 1rem;">
+                            <label>Ver Citas del Día:</label>
+                            <input type="date" id="agendaDate" onchange="loadAppointments()">
+                        </div>
+
+                        <div class="table-container">
+                            <table class="summary-table">
+                                <thead>
+                                    <tr>
+                                        <th>Hora</th>
+                                        <th>Cliente</th>
+                                        <th>Teléfono</th>
+                                        <th>Servicio</th>
+                                        <th>Notas</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="appointmentsBody">
+                                    <!-- Populated by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Productos Section -->
+            <section id="products" class="tab-content">
+                <h2>Registrar Venta</h2>
+                <form id="productForm">
+                    <div class="input-group">
+                        <label>Vendedor</label>
+                        <select name="estilista" required>
+                            <option value="" disabled selected>Seleccione un vendedor</option>
+                            {% for stylist in stylists %}
+                            <option value="{{ stylist }}">{{ stylist }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Producto</label>
+                        <input type="text" name="producto" id="saleProducto" list="productList"
+                            placeholder="Nombre del producto" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Marca</label>
+                        <input type="text" name="marca" id="saleMarca" placeholder="Marca (opcional)">
+                    </div>
+                    <div class="input-group">
+                        <label>Descripción</label>
+                        <input type="text" name="descripcion" id="saleDescripcion" placeholder="Descripción (opcional)">
+                    </div>
+                    <div class="input-group">
+                        <label>Valor ($)</label>
+                        <input type="number" name="valor" placeholder="0.00" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Método de Pago</label>
+                        <select name="metodo_pago" required>
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Tarjeta">Tarjeta</option>
+                            <option value="NEQUI">NEQUI</option>
+                            <option value="Daviplata">Daviplata</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="submit-btn">Registrar Venta</button>
+                </form>
+            </section>
+
+            <!-- Gastos Section -->
+            <section id="expenses" class="tab-content">
+                <h2>Registrar Gasto</h2>
+                <form id="expenseForm">
+                    <div class="input-group">
+                        <label>Descripción</label>
+                        <input type="text" name="descripcion" placeholder="Descripción del gasto" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Valor ($)</label>
+                        <input type="number" name="valor" placeholder="0.00" required>
+                    </div>
+                    <button type="submit" class="submit-btn">Registrar Gasto</button>
+                </form>
+            </section>
+
+
+            <!-- Gastos Mensuales Section -->
+            <section id="monthly-expenses" class="tab-content">
+                <h2>Gastos Mensuales Fijos</h2>
+                <div class="input-group" style="max-width: 300px; margin-bottom: 2rem;">
+                    <label>Seleccionar Mes</label>
+                    <input type="month" id="monthlyExpensesMonth" onchange="loadMonthlyExpenses()">
+                </div>
+
+                <form id="monthlyExpensesForm" onsubmit="saveMonthlyExpenses(event)">
+                    <div class="input-group">
+                        <label>Arriendo Local</label>
+                        <input type="number" name="arriendo" placeholder="0.00" step="0.01">
+                    </div>
+                    <div class="input-group">
+                        <label>Servicio de Agua</label>
+                        <input type="number" name="agua" placeholder="0.00" step="0.01">
+                    </div>
+                    <div class="input-group">
+                        <label>Servicio de Electricidad (Codensa)</label>
+                        <input type="number" name="electricidad" placeholder="0.00" step="0.01">
+                    </div>
+                    <div class="input-group">
+                        <label>Servicio de Internet y TV (Claro)</label>
+                        <input type="number" name="internet" placeholder="0.00" step="0.01">
+                    </div>
+                    <div class="input-group">
+                        <label>Cuota Banco (Davivienda)</label>
+                        <input type="number" name="banco" placeholder="0.00" step="0.01">
+                    </div>
+                    <div class="input-group">
+                        <label>Contrato Monica</label>
+                        <input type="number" name="monica" placeholder="0.00" step="0.01">
+                    </div>
+                    <button type="submit" class="submit-btn">Guardar Gastos Mensuales</button>
+                </form>
+            </section>
+
+            <!-- Inventory Section -->
+            <section id="inventory" class="tab-content">
+                <h2>Gestión de Inventario</h2>
+                <form id="inventoryForm">
+                    <div class="input-group">
+                        <label>Producto</label>
+                        <input type="text" name="producto" list="productList"
+                            placeholder="Seleccione o escriba un producto" required>
+                        <datalist id="productList">
+                            <!-- Populated by JS -->
+                        </datalist>
+                    </div>
+                    <div class="input-group">
+                        <label>Marca</label>
+                        <input type="text" name="marca" placeholder="Marca del producto (opcional)">
+                    </div>
+                    <div class="input-group">
+                        <label>Descripción</label>
+                        <input type="text" name="descripcion" placeholder="Descripción del producto (opcional)">
+                    </div>
+                    <div class="input-group">
+                        <label>Cantidad</label>
+                        <input type="number" name="cantidad" placeholder="0" step="0.01" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Unidad de Medida</label>
+                        <select name="unidad" required>
+                            <option value="Unidad">Unidad (und)</option>
+                            <option value="Mililitros">Mililitros (ml)</option>
+                            <option value="Gramos">Gramos (g)</option>
+                            <option value="Litros">Litros (L)</option>
+                            <option value="Kilos">Kilos (kg)</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Valor Unitario ($)</label>
+                        <input type="number" name="valor" placeholder="0.00" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Estado</label>
+                        <select name="estado" required>
+                            <option value="Nuevo">Nuevo</option>
+                            <option value="Usado">Usado</option>
+                            <option value="Agotado">Agotado</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="submit-btn">Guardar en Inventario</button>
+                </form>
+
+                <div class="table-container" style="margin-top: 2rem;">
+                    <h3>Inventario Actual</h3>
+                    <table class="summary-table">
+                        <thead>
+                            <tr>
+                                <th>Producto</th>
+                                <th>Marca</th>
+                                <th>Descripción</th>
+                                <th>Cantidad</th>
+                                <th>Unidad</th>
+                                <th>Valor Unitario</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventoryBody">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Summary Section -->
+            <section id="summary" class="tab-content">
+                <h2>Resumen Diario</h2>
+
+                <div class="filters-container" style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                    <div class="input-group" style="flex: 1; min-width: 200px;">
+                        <label>Fecha</label>
+                        <input type="date" id="filterDate" onchange="loadSummary()">
+                    </div>
+                    <div class="input-group" style="flex: 1; min-width: 200px;">
+                        <label>Filtrar por Estilista</label>
+                        <select id="filterStylist" onchange="applyFilters()">
+                            <option value="">Todos</option>
+                            {% for stylist in stylists %}
+                            <option value="{{ stylist }}">{{ stylist }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="input-group" style="flex: 1; min-width: 200px;">
+                        <label>Filtrar por Servicio</label>
+                        <select id="filterService" onchange="applyFilters()">
+                            <option value="">Todos</option>
+                            {% for service in services %}
+                            <option value="{{ service }}">{{ service }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div id="paymentSubtotals" class="payment-subtotals">
+                    <!-- Populated by JS -->
+                </div>
+
+                <div class="table-container">
+                    <table class="summary-table">
+                        <thead>
+                            <tr>
+                                <th>Estilista</th>
+                                <th>Servicio/Producto</th>
+                                <th>Valor</th>
+                                <th>Comisión</th>
+                                <th>Método Pago</th>
+                            </tr>
+                        </thead>
+                        <tbody id="summaryBody">
+                            <!-- Populated by JS -->
+                        </tbody>
+                        <tfoot>
+                            <tr class="total-row">
+                                <td colspan="2">TOTAL VENTAS</td>
+                                <td id="totalValue">$0</td>
+                                <td id="totalCommission">$0</td>
+                                <td></td>
+                            </tr>
+                            <tr class="total-row">
+                                <td colspan="2">TOTAL GASTOS</td>
+                                <td id="totalExpenses" colspan="3">$0</td>
+                            </tr>
+                            <tr class="total-row profit-row">
+                                <td colspan="2">UTILIDAD</td>
+                                <td id="totalProfit" colspan="3">$0</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 1rem;">
+                    <button class="submit-btn" onclick="loadSummary()">Actualizar</button>
+                    <button class="submit-btn" onclick="downloadPDF()" style="background: #d4af37;">Descargar
+                        PDF</button>
+                </div>
+            </section>
+
+            <!-- Statistics Section -->
+            <section id="statistics" class="tab-content">
+                <h2>Estadísticas Mensuales</h2>
+
+                <div class="input-group" style="max-width: 300px; margin-bottom: 2rem;">
+                    <label>Seleccionar Mes</label>
+                    <input type="month" id="statsMonth" onchange="loadStatistics()">
+                </div>
+
+                <div class="stats-cards"
+                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+                    <div class="stat-card">
+                        <h3>Ventas Netas</h3>
+                        <p class="stat-value" id="statsVentas">$0</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Gastos</h3>
+                        <p class="stat-value" id="statsGastos">$0</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Nómina Total</h3>
+                        <p class="stat-value" id="statsNomina">$0</p>
+                    </div>
+                    <div class="stat-card">
+                        <p class="stat-value" id="statsUtilidad">$0</p>
+                    </div>
+                    <div class="stat-card"
+                        style="border-color: rgba(234, 179, 8, 0.4); background: rgba(234, 179, 8, 0.1);">
+                        <h3 style="color: #fde047;">Gastos Fijos</h3>
+                        <p class="stat-value" id="statsGastosFijos"
+                            style="background: linear-gradient(to right, #fde047, #ea580c); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;">
+                            $0</p>
+                    </div>
+                    <div class="stat-card"
+                        style="border-color: rgba(34, 197, 94, 0.4); background: rgba(34, 197, 94, 0.1);">
+                        <h3 style="color: #4ade80;">Utilidad Real</h3>
+                        <p class="stat-value" id="statsUtilidadReal"
+                            style="background: linear-gradient(to right, #4ade80, #16a34a); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;">
+                            $0</p>
+                    </div>
+                </div>
+
+                <div class="charts-container"
+                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2rem; margin-bottom: 2rem;">
+                    <div class="chart-wrapper" style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 12px;">
+                        <h3 style="text-align: center; margin-bottom: 1rem;">Distribución de Nómina</h3>
+                        <canvas id="payrollChart"></canvas>
+                    </div>
+                    <div class="chart-wrapper" style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 12px;">
+                        <h3 style="text-align: center; margin-bottom: 1rem;">Ventas por Estilista</h3>
+                        <canvas id="salesChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="charts-container"
+                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2rem; margin-bottom: 2rem;">
+                    <div class="chart-wrapper"
+                        style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 12px; width: 100%;">
+                        <h3 style="text-align: center; margin-bottom: 1rem;">Top Servicios Realizados</h3>
+                        <canvas id="servicesChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-wrapper"
+                    style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 12px; margin-bottom: 2rem;">
+                    <h3 style="text-align: center; margin-bottom: 1rem;">Histórico de Ventas Mensuales (Año Actual)</h3>
+                    <canvas id="timelineChart"></canvas>
+                </div>
+
+                <h3>Nómina por Estilista</h3>
+                <div class="table-container">
+                    <table class="summary-table">
+                        <thead>
+                            <tr>
+                                <th>Estilista</th>
+                                <th>Comisiones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="statsNominaBody">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 style="margin-top: 2rem;">Ventas por Estilista</h3>
+                <div class="table-container">
+                    <table class="summary-table">
+                        <thead>
+                            <tr>
+                                <th>Estilista</th>
+                                <th>Total Ventas</th>
+                            </tr>
+                        </thead>
+                        <tbody id="statsVentasBody">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 style="margin-top: 2rem;">Inventario Resumido</h3>
+                <div class="table-container">
+                    <table class="summary-table">
+                        <thead>
+                            <tr>
+                                <th>Producto</th>
+                                <th>Cantidad</th>
+                                <th>Unidad</th>
+                                <th>Valor Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="statsInventoryBody">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Config Section -->
+            <section id="config" class="tab-content">
+                <h2>Configuración de Estilistas</h2>
+
+                <div class="config-container">
+                    <h3>Agregar Nuevo Estilista</h3>
+                    <form id="addStylistForm">
+                        <div class="input-group">
+                            <input type="text" name="name" placeholder="Nombre del nuevo estilista" required>
+                        </div>
+                        <button type="submit" class="submit-btn">Agregar</button>
+                    </form>
+
+                    <h3 style="margin-top: 2rem;">Lista de Estilistas</h3>
+                    <ul class="stylist-list">
+                        {% for stylist in stylists %}
+                        <li class="stylist-item">
+                            <span>{{ stylist }}</span>
+                            <button class="delete-btn" onclick="deleteStylist('{{ stylist }}')">Eliminar</button>
+                        </li>
+                        {% endfor %}
+                    </ul>
+
+                    <hr style="margin: 2rem 0; border: 0; border-top: 1px solid #e5e7eb;">
+
+                    <h3>Agregar Nuevo Servicio</h3>
+                    <form id="addServiceForm">
+                        <div class="input-group">
+                            <input type="text" name="name" placeholder="Nombre del nuevo servicio" required>
+                        </div>
+                        <button type="submit" class="submit-btn">Agregar</button>
+                    </form>
+
+                    <h3 style="margin-top: 2rem;">Lista de Servicios</h3>
+                    <ul class="stylist-list">
+                        {% for service in services %}
+                        <li class="stylist-item">
+                            <span>{{ service }}</span>
+                            <button class="delete-btn" onclick="deleteService('{{ service }}')">Eliminar</button>
+                        </li>
+                        {% endfor %}
+                    </ul>
+
+                    <hr style="margin: 2rem 0; border: 0; border-top: 1px solid #e5e7eb;">
+
+                    <h3>Gestión de Sedes</h3>
+                    <form id="addSedeForm" onsubmit="addSedeHandler(event)">
+                        <div class="input-group">
+                            <input type="text" name="name" placeholder="Nombre de la nueva sede" required>
+                        </div>
+                        <button type="submit" class="submit-btn">Agregar</button>
+                    </form>
+
+                    <h3 style="margin-top: 2rem;">Lista de Sedes</h3>
+                    <ul class="stylist-list" id="sedesList">
+                        {% for sede in sedes %}
+                        <li class="stylist-item">
+                            <span>{{ sede }}</span>
+                            <button class="delete-btn" onclick="deleteSede('{{ sede }}')">Eliminar</button>
+                        </li>
+                        {% endfor %}
+                    </ul>
+
+                    <hr style="margin: 2rem 0; border: 0; border-top: 1px solid #e5e7eb;">
+
+                    <h3>Gestión de Usuarios</h3>
+                    <form id="addUserForm" onsubmit="addUserHandler(event)">
+                        <div class="input-group">
+                            <input type="text" name="username" placeholder="Usuario" required>
+                        </div>
+                        <div class="input-group">
+                            <input type="password" name="password" placeholder="Contraseña" required>
+                        </div>
+                        <button type="submit" class="submit-btn">Agregar Usuario</button>
+                    </form>
+
+                    <h3 style="margin-top: 2rem;">Lista de Usuarios</h3>
+                    <ul class="stylist-list" id="usersList">
+                        <!-- Populated by JS -->
+                    </ul>
+                </div>
+            </section>
+        </main>
+
+        <div id="notification" class="notification hidden">
+            <p id="notif-message"></p>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+
+</html>

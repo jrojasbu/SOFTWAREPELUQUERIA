@@ -1,0 +1,1234 @@
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, make_response
+from werkzeug.security import generate_password_hash, check_password_hash
+import functools
+import pandas as pd
+import os
+from datetime import datetime
+import openpyxl
+import json
+from io import BytesIO
+from xhtml2pdf import pisa
+
+app = Flask(__name__)
+app.secret_key = 'magical_hair_secret_key_change_this_in_production'  # Required for session
+
+DB_FILE = 'database.xlsx'
+STYLISTS_FILE = 'stylists.json'
+SERVICES_FILE = 'services.json'
+SEDES_FILE = 'sedes.json'
+USERS_FILE = 'users.json'
+
+def login_required(view):
+    @functools.wraps(view)
+    def wrapped_view(**kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('login'))
+        return view(**kwargs)
+    return wrapped_view
+
+def get_users():
+    try:
+        if not os.path.exists(USERS_FILE):
+            # Create default admin user
+            default_users = {
+                'admin': generate_password_hash('admin')
+            }
+            save_users(default_users)
+            return default_users
+        with open(USERS_FILE, 'r') as f:
+            return json.load(f)
+    except:
+        return {}
+
+def save_users(users):
+    with open(USERS_FILE, 'w') as f:
+        json.dump(users, f, indent=2)
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        data = request.json
+        username = data.get('username')
+        password = data.get('password')
+        
+        users = get_users()
+        
+        if username in users and check_password_hash(users[username], password):
+            session.clear()
+            session['user_id'] = username
+            return jsonify({'status': 'success', 'message': 'Login exitoso'})
+        
+        return jsonify({'status': 'error', 'message': 'Usuario o contraseña incorrectos'})
+    
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+@app.route('/api/users', methods=['GET'])
+@login_required
+def get_users_api():
+    users = get_users()
+    # Return list of usernames only
+    return jsonify({'status': 'success', 'data': list(users.keys())})
+
+@app.route('/api/users', methods=['POST'])
+@login_required
+def add_user():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+    
+    if not username or not password:
+        return jsonify({'status': 'error', 'message': 'Usuario y contraseña requeridos'})
+        
+    users = get_users()
+    if username in users:
+        return jsonify({'status': 'error', 'message': 'El usuario ya existe'})
+        
+    users[username] = generate_password_hash(password)
+    save_users(users)
+    return jsonify({'status': 'success', 'message': 'Usuario creado'})
+
+@app.route('/api/users', methods=['DELETE'])
+@login_required
+def delete_user():
+    data = request.json
+    username = data.get('username')
+    
+    if username == 'admin':
+        return jsonify({'status': 'error', 'message': 'No se puede eliminar el usuario admin'})
+        
+    if username == session.get('user_id'):
+        return jsonify({'status': 'error', 'message': 'No puedes eliminar tu propio usuario'})
+        
+    users = get_users()
+    if username in users:
+        del users[username]
+        save_users(users)
+        return jsonify({'status': 'success', 'message': 'Usuario eliminado'})
+        
+    return jsonify({'status': 'error', 'message': 'Usuario no encontrado'})
+
+
+
+def check_and_migrate_db():
+    """Check if the database has all required columns and add them if missing."""
+    if os.path.exists(DB_FILE):
+        try:
+            # Check Services sheet
+            df_services = pd.read_excel(DB_FILE, sheet_name='Servicios')
+            needs_update = False
+            
+            if 'Metodo_Pago' not in df_services.columns:
+                print("Migrating Services sheet: Adding Metodo_Pago column...")
+                df_services['Metodo_Pago'] = 'Efectivo'
+                needs_update = True
+                
+            if 'Sede' not in df_services.columns:
+                print("Migrating Services sheet: Adding Sede column...")
+                df_services.insert(0, 'Sede', 'Principal')
+                needs_update = True
+                
+            if needs_update:
+                with pd.ExcelWriter(DB_FILE, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+                    df_services.to_excel(writer, sheet_name='Servicios', index=False)
+                    
+            # Check Products sheet
+            df_products = pd.read_excel(DB_FILE, sheet_name='Productos')
+            cols_to_add = []
+            if 'Metodo_Pago' not in df_products.columns: cols_to_add.append('Metodo_Pago')
+            if 'Marca' not in df_products.columns: cols_to_add.append('Marca')
+            if 'Descripcion' not in df_products.columns: cols_to_add.append('Descripcion')
+            
+            needs_update = False
+            if cols_to_add:
+                print(f"Migrating Products sheet: Adding {cols_to_add}...")
+                for col in cols_to_add:
+                    df_products[col] = '' if col != 'Metodo_Pago' else 'Efectivo'
+                needs_update = True
+                
+            if 'Sede' not in df_products.columns:
+                print("Migrating Products sheet: Adding Sede column...")
+                df_products.insert(0, 'Sede', 'Principal')
+                needs_update = True
+                
+            if needs_update:
+                with pd.ExcelWriter(DB_FILE, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+                    df_products.to_excel(writer, sheet_name='Productos', index=False)
+            
+            # Check Gastos sheet
+            try:
+                df_gastos = pd.read_excel(DB_FILE, sheet_name='Gastos')
+                if 'Sede' not in df_gastos.columns:
+                    print("Migrating Gastos sheet: Adding Sede column...")
+                    df_gastos.insert(0, 'Sede', 'Principal')
+                    with pd.ExcelWriter(DB_FILE, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+                        df_gastos.to_excel(writer, sheet_name='Gastos', index=False)
+            except:
+                pass
+            
+            # Check Inventory sheet
+            try:
+                df_inventario = pd.read_excel(DB_FILE, sheet_name='Inventario')
+                needs_update = False
+                
+                if 'Marca' not in df_inventario.columns:
+                    df_inventario['Marca'] = ''
+                    needs_update = True
+                if 'Estado' not in df_inventario.columns:
+                    df_inventario['Estado'] = 'Nuevo'
+                    needs_update = True
+                if 'Sede' not in df_inventario.columns:
+                    print("Migrating Inventario sheet: Adding Sede column...")
+                    df_inventario.insert(0, 'Sede', 'Principal')
+                    needs_update = True
+                    
+                if needs_update:
+                    with pd.ExcelWriter(DB_FILE, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+                        df_inventario.to_excel(writer, sheet_name='Inventario', index=False)
+            except ValueError:
+                print("Migrating: Adding Inventario sheet...")
+                with pd.ExcelWriter(DB_FILE, engine='openpyxl', mode='a') as writer:
+                    pd.DataFrame(columns=['Sede', 'Producto', 'Marca', 'Descripcion', 'Cantidad', 'Unidad', 'Valor', 'Estado', 'Fecha_Actualizacion']).to_excel(writer, sheet_name='Inventario', index=False)
+
+            # Check Citas sheet
+            wb = openpyxl.load_workbook(DB_FILE)
+            if 'Citas' not in wb.sheetnames:
+                ws = wb.create_sheet('Citas')
+                ws.append(['ID', 'Sede', 'Fecha', 'Hora', 'Cliente', 'Telefono', 'Servicio', 'Notas', 'Estado'])
+                wb.save(DB_FILE)
+                print("Migrated database: Added Citas sheet")
+            else:
+                ws = wb['Citas']
+                headers = [cell.value for cell in ws[1]]
+                
+                needs_save = False
+                if 'ID' not in headers:
+                    ws.insert_cols(1)
+                    ws.cell(row=1, column=1, value='ID')
+                    import uuid
+                    for row in range(2, ws.max_row + 1):
+                        ws.cell(row=row, column=1, value=str(uuid.uuid4()))
+                    headers = [cell.value for cell in ws[1]]  # Refresh headers
+                    needs_save = True
+                    
+                if 'Sede' not in headers:
+                    print("Migrating Citas sheet: Adding Sede column...")
+                    # Insert Sede after ID (column 2)
+                    ws.insert_cols(2)
+                    ws.cell(row=1, column=2, value='Sede')
+                    for row in range(2, ws.max_row + 1):
+                        ws.cell(row=row, column=2, value='Principal')
+                    needs_save = True
+                    
+                if needs_save:
+                    wb.save(DB_FILE)
+                    print("Migrated database: Updated Citas sheet")
+
+            # Check GastosMensuales sheet
+            try:
+                wb = openpyxl.load_workbook(DB_FILE)
+                if 'GastosMensuales' not in wb.sheetnames:
+                    ws = wb.create_sheet('GastosMensuales')
+                    ws.append(['Sede', 'Mes', 'Tipo', 'Valor', 'Fecha_Registro'])
+                    wb.save(DB_FILE)
+                    print("Migrated database: Added GastosMensuales sheet")
+                else:
+                    # Check columns if needed, strict migration might not be needed if we just created it
+                    pass
+            except Exception as e:
+                print(f"Error checking GastosMensuales: {e}")
+
+        except Exception as e:
+            print(f"Error during migration: {e}")
+
+def init_db():
+    """Initialize the Excel database if it doesn't exist."""
+    if not os.path.exists(DB_FILE):
+        with pd.ExcelWriter(DB_FILE, engine='openpyxl') as writer:
+            pd.DataFrame(columns=['Sede', 'Fecha', 'Estilista', 'Servicio', 'Valor', 'Comision', 'Metodo_Pago']).to_excel(writer, sheet_name='Servicios', index=False)
+            pd.DataFrame(columns=['Sede', 'Fecha', 'Estilista', 'Producto', 'Marca', 'Descripcion', 'Valor', 'Comision', 'Metodo_Pago']).to_excel(writer, sheet_name='Productos', index=False)
+            pd.DataFrame(columns=['Sede', 'Fecha', 'Descripcion', 'Valor']).to_excel(writer, sheet_name='Gastos', index=False)
+            pd.DataFrame(columns=['Sede', 'Producto', 'Marca', 'Descripcion', 'Cantidad', 'Unidad', 'Valor', 'Estado', 'Fecha_Actualizacion']).to_excel(writer, sheet_name='Inventario', index=False)
+            pd.DataFrame(columns=['ID', 'Sede', 'Fecha', 'Hora', 'Cliente', 'Telefono', 'Servicio', 'Notas', 'Estado']).to_excel(writer, sheet_name='Citas', index=False)
+            pd.DataFrame(columns=['Sede', 'Mes', 'Tipo', 'Valor', 'Fecha_Registro']).to_excel(writer, sheet_name='GastosMensuales', index=False)
+        print(f"Database {DB_FILE} created.")
+    else:
+        check_and_migrate_db()
+
+
+def get_stylists():
+    try:
+        with open(STYLISTS_FILE, 'r') as f:
+            return json.load(f)
+    except:
+        return []
+
+def save_stylists(stylists):
+    with open(STYLISTS_FILE, 'w') as f:
+        json.dump(stylists, f)
+
+def get_services():
+    try:
+        with open(SERVICES_FILE, 'r') as f:
+            return json.load(f)
+    except:
+        return []
+
+def save_services(services):
+    with open(SERVICES_FILE, 'w') as f:
+        json.dump(services, f)
+
+def get_sedes():
+    try:
+        with open(SEDES_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except:
+        # Return default sede if file doesn't exist
+        default = ['Principal']
+        save_sedes(default)
+        return default
+
+def save_sedes(sedes):
+    with open(SEDES_FILE, 'w', encoding='utf-8') as f:
+        json.dump(sedes, f, ensure_ascii=False, indent=2)
+
+def append_to_excel(sheet_name, data):
+    """Append a row of data to the specified sheet in the Excel file."""
+    try:
+        # Load existing file
+        with pd.ExcelWriter(DB_FILE, engine='openpyxl', mode='a', if_sheet_exists='overlay') as writer:
+            # Load the sheet to find the last row and get column order
+            try:
+                reader = pd.read_excel(DB_FILE, sheet_name=sheet_name)
+                start_row = len(reader) + 1
+                # Get existing column order
+                columns = reader.columns.tolist()
+            except ValueError:
+                start_row = 0
+                # If sheet doesn't exist, use data keys as columns
+                columns = list(data.keys())
+            
+            # Create DataFrame with correct column order
+            df_new = pd.DataFrame([data], columns=columns)
+            
+            # Write the new data
+            df_new.to_excel(writer, sheet_name=sheet_name, index=False, header=False, startrow=start_row)
+        return True
+    except Exception as e:
+        print(f"Error writing to Excel: {e}")
+        return False
+
+@app.route('/')
+@login_required
+def index():
+    stylists = get_stylists()
+    services = get_services()
+    sedes = get_sedes()
+    return render_template('index.html', stylists=stylists, services=services, sedes=sedes)
+
+@app.route('/api/stylist', methods=['POST'])
+@login_required
+def add_stylist():
+    data = request.json
+    new_stylist = data.get('name')
+    if new_stylist:
+        stylists = get_stylists()
+        if new_stylist not in stylists:
+            stylists.append(new_stylist)
+            save_stylists(stylists)
+            return jsonify({'status': 'success', 'message': 'Estilista agregado'})
+        return jsonify({'status': 'error', 'message': 'El estilista ya existe'})
+    return jsonify({'status': 'error', 'message': 'Nombre inválido'})
+
+@app.route('/api/stylist', methods=['DELETE'])
+@login_required
+def delete_stylist():
+    data = request.json
+    name_to_delete = data.get('name')
+    stylists = get_stylists()
+    if name_to_delete in stylists:
+        stylists.remove(name_to_delete)
+        save_stylists(stylists)
+        return jsonify({'status': 'success', 'message': 'Estilista eliminado'})
+    return jsonify({'status': 'error', 'message': 'Estilista no encontrado'})
+
+@app.route('/api/service-item', methods=['POST'])
+@login_required
+def add_service_item():
+    data = request.json
+    new_service = data.get('name')
+    if new_service:
+        services = get_services()
+        if new_service not in services:
+            services.append(new_service)
+            save_services(services)
+            return jsonify({'status': 'success', 'message': 'Servicio agregado'})
+        return jsonify({'status': 'error', 'message': 'El servicio ya existe'})
+    return jsonify({'status': 'error', 'message': 'Nombre inválido'})
+
+@app.route('/api/service-item', methods=['DELETE'])
+@login_required
+def delete_service_item():
+    data = request.json
+    name_to_delete = data.get('name')
+    services = get_services()
+    if name_to_delete in services:
+        services.remove(name_to_delete)
+        save_services(services)
+        return jsonify({'status': 'success', 'message': 'Servicio eliminado'})
+    return jsonify({'status': 'error', 'message': 'Servicio no encontrado'})
+
+@app.route('/api/sedes', methods=['GET'])
+@login_required
+def get_sedes_api():
+    sedes = get_sedes()
+    return jsonify({'status': 'success', 'data': sedes})
+
+@app.route('/api/sede', methods=['POST'])
+@login_required
+def add_sede():
+    data = request.json
+    new_sede = data.get('name')
+    if new_sede:
+        sedes = get_sedes()
+        if new_sede not in sedes:
+            sedes.append(new_sede)
+            save_sedes(sedes)
+            return jsonify({'status': 'success', 'message': 'Sede agregada'})
+        return jsonify({'status': 'error', 'message': 'La sede ya existe'})
+    return jsonify({'status': 'error', 'message': 'Nombre inválido'})
+
+@app.route('/api/sede', methods=['DELETE'])
+@login_required
+def delete_sede():
+    data = request.json
+    name_to_delete = data.get('name')
+    sedes = get_sedes()
+    if len(sedes) <= 1:
+        return jsonify({'status': 'error', 'message': 'No se puede eliminar la última sede'})
+    if name_to_delete in sedes:
+        sedes.remove(name_to_delete)
+        save_sedes(sedes)
+        return jsonify({'status': 'success', 'message': 'Sede eliminada'})
+    return jsonify({'status': 'error', 'message': 'Sede no encontrada'})
+
+def calculate_commission(stylist, service, value):
+    service_lower = service.lower()
+    is_special_service = 'tinte' in service_lower or 'mechas' in service_lower
+    
+    if 'monica' in stylist.lower():
+        if is_special_service:
+            return value * 0.50
+        return value * 0.40
+    
+    if 'elizabeth' in stylist.lower():
+        if is_special_service:
+            return value * 0.60
+        return value * 0.50
+        
+    # Default for others
+    return value * 0.50
+
+@app.route('/api/service', methods=['POST'])
+@login_required
+def add_service():
+    data = request.json
+    valor = float(data['valor'])
+    stylist = data['estilista']
+    service = data['servicio']
+    metodo_pago = data.get('metodo_pago', 'Efectivo')
+    sede = data.get('sede', 'Principal')
+    
+    comision = calculate_commission(stylist, service, valor)
+    
+    record = {
+        'Sede': sede,
+        'Fecha': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'Estilista': stylist,
+        'Servicio': service,
+        'Valor': valor,
+        'Comision': comision,
+        'Metodo_Pago': metodo_pago
+    }
+    
+    if append_to_excel('Servicios', record):
+        return jsonify({'status': 'success', 'message': 'Servicio registrado', 'comision': comision})
+    return jsonify({'status': 'error', 'message': 'Error al guardar'}), 500
+
+@app.route('/api/product', methods=['POST'])
+@login_required
+def add_product():
+    data = request.json
+    valor = float(data['valor'])
+    metodo_pago = data.get('metodo_pago', 'Efectivo')
+    marca = data.get('marca', '')
+    descripcion = data.get('descripcion', '')
+    sede = data.get('sede', 'Principal')
+    
+    record = {
+        'Sede': sede,
+        'Fecha': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'Estilista': data['estilista'],
+        'Producto': data['producto'],
+        'Marca': marca,
+        'Descripcion': descripcion,
+        'Valor': valor,
+        'Comision': valor * 0.10,
+        'Metodo_Pago': metodo_pago
+    }
+    
+    if append_to_excel('Productos', record):
+        # Update Inventory
+        try:
+            df_inv = pd.read_excel(DB_FILE, sheet_name='Inventario')
+            product_name = data['producto']
+            
+            # Filter matches by sede first
+            matches = df_inv[(df_inv['Producto'] == product_name) & (df_inv['Sede'] == sede)]
+            
+            # If marca is provided, try to filter by it too
+            if marca and 'Marca' in df_inv.columns:
+                marca_matches = matches[matches['Marca'] == marca]
+                if not marca_matches.empty:
+                    matches = marca_matches
+            
+            if not matches.empty:
+                # Take the first match
+                idx = matches.index[0]
+                current_qty = float(df_inv.at[idx, 'Cantidad'])
+                
+                if current_qty > 0:
+                    new_qty = current_qty - 1
+                    df_inv.at[idx, 'Cantidad'] = new_qty
+                    
+                    if new_qty <= 0:
+                        df_inv.at[idx, 'Estado'] = 'Agotado'
+                    
+                    with pd.ExcelWriter(DB_FILE, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+                        df_inv.to_excel(writer, sheet_name='Inventario', index=False)
+                        
+        except Exception as e:
+            print(f"Error updating inventory: {e}")
+            
+        return jsonify({'status': 'success', 'message': 'Producto registrado y descontado del inventario'})
+    return jsonify({'status': 'error', 'message': 'Error al guardar'}), 500
+
+@app.route('/api/expense', methods=['POST'])
+@login_required
+def add_expense():
+    data = request.json
+    sede = data.get('sede', 'Principal')
+    record = {
+        'Sede': sede,
+        'Fecha': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'Descripcion': data['descripcion'],
+        'Valor': float(data['valor'])
+    }
+    
+    if append_to_excel('Gastos', record):
+        return jsonify({'status': 'success', 'message': 'Gasto registrado'})
+    return jsonify({'status': 'error', 'message': 'Error al guardar'}), 500
+
+@app.route('/api/inventory', methods=['GET'])
+@login_required
+def get_inventory():
+    try:
+        sede_filter = request.args.get('sede', 'Principal')
+        df = pd.read_excel(DB_FILE, sheet_name='Inventario')
+        # Filter by sede
+        df = df[df['Sede'] == sede_filter]
+        # Replace NaN with empty string or 0 for JSON serialization
+        df = df.fillna('')
+        inventory = df.to_dict(orient='records')
+        return jsonify({'status': 'success', 'data': inventory})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/inventory', methods=['POST'])
+@login_required
+def add_inventory_item():
+    try:
+        data = request.json
+        producto = data.get('producto')
+        marca = data.get('marca', '')
+        descripcion = data.get('descripcion', '')
+        cantidad = float(data.get('cantidad', 0))
+        unidad = data.get('unidad')
+        valor = float(data.get('valor', 0))
+        estado = data.get('estado', 'Nuevo')
+        sede = data.get('sede', 'Principal')
+        
+        if not producto:
+            return jsonify({'status': 'error', 'message': 'Nombre del producto requerido'}), 400
+
+        # Load existing inventory
+        try:
+            df = pd.read_excel(DB_FILE, sheet_name='Inventario')
+        except ValueError:
+            # Sheet might not exist if migration failed or file is weird, but init_db should handle it.
+            df = pd.DataFrame(columns=['Producto', 'Marca', 'Descripcion', 'Cantidad', 'Unidad', 'Valor', 'Estado', 'Fecha_Actualizacion'])
+
+        # Check if product exists to update
+        # Ensure columns exist and fill NaNs for comparison
+        if 'Marca' not in df.columns: df['Marca'] = ''
+        if 'Descripcion' not in df.columns: df['Descripcion'] = ''
+        
+        df['Marca'] = df['Marca'].fillna('')
+        df['Descripcion'] = df['Descripcion'].fillna('')
+        
+        # Check for exact match on Sede, Name, Brand, and Description
+        mask = (df['Sede'] == sede) & (df['Producto'] == producto) & (df['Marca'] == marca) & (df['Descripcion'] == descripcion)
+        
+        if mask.any():
+            # Update existing
+            idx = df.index[mask].tolist()[0]
+            df.at[idx, 'Cantidad'] = cantidad
+            df.at[idx, 'Unidad'] = unidad
+            df.at[idx, 'Valor'] = valor
+            df.at[idx, 'Estado'] = estado
+            df.at[idx, 'Fecha_Actualizacion'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            message = 'Producto actualizado'
+        else:
+            # Add new
+            new_row = {
+                'Sede': sede,
+                'Producto': producto,
+                'Marca': marca,
+                'Descripcion': descripcion,
+                'Cantidad': cantidad,
+                'Unidad': unidad,
+                'Valor': valor,
+                'Estado': estado,
+                'Fecha_Actualizacion': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }
+            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+            message = 'Producto agregado al inventario'
+            
+        # Save back to Excel
+        with pd.ExcelWriter(DB_FILE, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+            df.to_excel(writer, sheet_name='Inventario', index=False)
+            
+        return jsonify({'status': 'success', 'message': message})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/inventory', methods=['DELETE'])
+@login_required
+def delete_inventory_item():
+    try:
+        data = request.json
+        producto = data.get('producto')
+        marca = data.get('marca', '')
+        descripcion = data.get('descripcion', '')
+        sede = data.get('sede', 'Principal')
+        
+        df = pd.read_excel(DB_FILE, sheet_name='Inventario')
+        
+        # Ensure columns exist
+        if 'Marca' not in df.columns: df['Marca'] = ''
+        if 'Descripcion' not in df.columns: df['Descripcion'] = ''
+        
+        df['Marca'] = df['Marca'].fillna('')
+        df['Descripcion'] = df['Descripcion'].fillna('')
+        
+        # Filter by sede, producto, marca, descripcion
+        mask = (df['Sede'] == sede) & (df['Producto'] == producto) & (df['Marca'] == marca) & (df['Descripcion'] == descripcion)
+        
+        if mask.any():
+            df = df[~mask]
+            with pd.ExcelWriter(DB_FILE, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+                df.to_excel(writer, sheet_name='Inventario', index=False)
+            return jsonify({'status': 'success', 'message': 'Producto eliminado del inventario'})
+        return jsonify({'status': 'error', 'message': 'Producto no encontrado'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/summary', methods=['GET'])
+@login_required
+def get_summary():
+    try:
+        # Get date and sede from query parameters
+        date_filter = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
+        sede_filter = request.args.get('sede', 'Principal')
+        summary_data = []
+        total_valor = 0
+        total_comision = 0
+        total_gastos = 0
+
+        # Read Services
+        try:
+            df_services = pd.read_excel(DB_FILE, sheet_name='Servicios')
+            for _, row in df_services.iterrows():
+                if str(row['Fecha']).startswith(date_filter) and row['Sede'] == sede_filter:
+                    val = float(row['Valor']) if pd.notna(row['Valor']) else 0.0
+                    com = float(row['Comision']) if pd.notna(row['Comision']) else 0.0
+                    
+                    metodo = row.get('Metodo_Pago', 'N/A')
+                    if pd.isna(metodo):
+                        metodo = 'N/A'
+                        
+                    summary_data.append({
+                        'estilista': row['Estilista'],
+                        'descripcion': row['Servicio'],
+                        'valor': val,
+                        'comision': com,
+                        'tipo': 'Servicio',
+                        'metodo_pago': metodo
+                    })
+                    total_valor += val
+                    total_comision += com
+        except Exception as e:
+            print(f"Error reading services: {e}")
+
+        # Read Products
+        try:
+            df_products = pd.read_excel(DB_FILE, sheet_name='Productos')
+            for _, row in df_products.iterrows():
+                if str(row['Fecha']).startswith(date_filter) and row['Sede'] == sede_filter:
+                    val = float(row['Valor']) if pd.notna(row['Valor']) else 0.0
+                    com = float(row['Comision']) if pd.notna(row['Comision']) else 0.0
+                    
+                    metodo = row.get('Metodo_Pago', 'N/A')
+                    if pd.isna(metodo):
+                        metodo = 'N/A'
+
+                    summary_data.append({
+                        'estilista': row['Estilista'],
+                        'descripcion': row['Producto'],
+                        'valor': val,
+                        'comision': com,
+                        'tipo': 'Producto',
+                        'metodo_pago': metodo
+                    })
+                    total_valor += val
+                    total_comision += com
+        except Exception as e:
+            print(f"Error reading products: {e}")
+
+        # Read Expenses
+        try:
+            df_expenses = pd.read_excel(DB_FILE, sheet_name='Gastos')
+            for _, row in df_expenses.iterrows():
+                if str(row['Fecha']).startswith(date_filter) and row['Sede'] == sede_filter:
+                    val = float(row['Valor']) if pd.notna(row['Valor']) else 0.0
+                    total_gastos += val
+        except Exception as e:
+            print(f"Error reading expenses: {e}")
+
+        # Calculate profit: Net Sales - Expenses - Commissions
+        utilidad = total_valor - total_gastos - total_comision
+
+        return jsonify({
+            'status': 'success',
+            'data': summary_data,
+            'totals': {
+                'valor': total_valor,
+                'comision': total_comision,
+                'gastos': total_gastos,
+                'utilidad': utilidad
+            }
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+def render_pdf(template_src, context_dict):
+    template = app.jinja_env.get_template(template_src)
+    html = template.render(context_dict)
+    result = BytesIO()
+    pdf = pisa.pisaDocument(BytesIO(html.encode("UTF-8")), result)
+    if not pdf.err:
+        return result.getvalue()
+    return None
+
+@app.route('/export_pdf')
+@login_required
+def export_pdf():
+    try:
+        date_filter = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
+        
+        # Reuse logic to get data (this could be refactored into a separate function to avoid duplication)
+        # For now, I'll just call the internal logic or copy it. 
+        # Calling the internal logic is cleaner if I extract it, but to minimize changes I will copy the core logic 
+        # or better yet, I will refactor get_summary to return a dict that I can use here.
+        
+        # Let's do a quick extraction of the data gathering logic to avoid code duplication? 
+        # Actually, for safety and speed, I will duplicate the data gathering logic here slightly modified for Python usage 
+        # (not returning jsonify) or just call the same logic.
+        
+        summary_data = []
+        total_valor = 0
+        total_comision = 0
+        total_gastos = 0
+
+        # Read Services
+        try:
+            df_services = pd.read_excel(DB_FILE, sheet_name='Servicios')
+            for _, row in df_services.iterrows():
+                if str(row['Fecha']).startswith(date_filter):
+                    val = float(row['Valor']) if pd.notna(row['Valor']) else 0.0
+                    com = float(row['Comision']) if pd.notna(row['Comision']) else 0.0
+                    metodo = row.get('Metodo_Pago', 'N/A')
+                    if pd.isna(metodo): metodo = 'N/A'
+                        
+                    summary_data.append({
+                        'estilista': row['Estilista'],
+                        'descripcion': row['Servicio'],
+                        'valor': val,
+                        'comision': com,
+                        'tipo': 'Servicio',
+                        'metodo_pago': metodo
+                    })
+                    total_valor += val
+                    total_comision += com
+        except: pass
+
+        # Read Products
+        try:
+            df_products = pd.read_excel(DB_FILE, sheet_name='Productos')
+            for _, row in df_products.iterrows():
+                if str(row['Fecha']).startswith(date_filter):
+                    val = float(row['Valor']) if pd.notna(row['Valor']) else 0.0
+                    com = float(row['Comision']) if pd.notna(row['Comision']) else 0.0
+                    metodo = row.get('Metodo_Pago', 'N/A')
+                    if pd.isna(metodo): metodo = 'N/A'
+
+                    summary_data.append({
+                        'estilista': row['Estilista'],
+                        'descripcion': row['Producto'],
+                        'valor': val,
+                        'comision': com,
+                        'tipo': 'Producto',
+                        'metodo_pago': metodo
+                    })
+                    total_valor += val
+                    total_comision += com
+        except: pass
+
+        # Read Expenses
+        try:
+            df_expenses = pd.read_excel(DB_FILE, sheet_name='Gastos')
+            for _, row in df_expenses.iterrows():
+                if str(row['Fecha']).startswith(date_filter):
+                    val = float(row['Valor']) if pd.notna(row['Valor']) else 0.0
+                    total_gastos += val
+        except: pass
+
+        utilidad = total_valor - total_gastos - total_comision
+        
+        totals = {
+            'valor': total_valor,
+            'comision': total_comision,
+            'gastos': total_gastos,
+            'utilidad': utilidad
+        }
+
+        # Logo path
+        logo_path = os.path.join(app.root_path, 'Logo', 'Magical_Hair.png')
+        # Check if exists, if not try .ico or None
+        if not os.path.exists(logo_path):
+             logo_path = os.path.join(app.root_path, 'Logo', 'Magical_Hair.ico')
+             if not os.path.exists(logo_path):
+                 logo_path = None
+
+        context = {
+            'data': summary_data,
+            'totals': totals,
+            'date': date_filter,
+            'logo_path': logo_path,
+            'generation_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
+
+        pdf = render_pdf('pdf_report.html', context)
+        if pdf:
+            response = make_response(pdf)
+            response.headers['Content-Type'] = 'application/pdf'
+            response.headers['Content-Disposition'] = f'attachment; filename=Cierre_{date_filter}.pdf'
+            return response
+        
+        return "Error generating PDF", 500
+
+    except Exception as e:
+        return str(e), 500
+
+@app.route('/api/statistics', methods=['GET'])
+@login_required
+def get_statistics():
+    try:
+        # Get month from query parameter (format: YYYY-MM)
+        month_filter = request.args.get('month', datetime.now().strftime('%Y-%m'))
+        year, month = month_filter.split('-')
+        sede_filter = request.args.get('sede', '') # Optional sede filter
+        
+        # Read all sheets
+        servicios_df = pd.read_excel(DB_FILE, sheet_name='Servicios')
+        productos_df = pd.read_excel(DB_FILE, sheet_name='Productos')
+        gastos_df = pd.read_excel(DB_FILE, sheet_name='Gastos')
+        inventario_df = pd.read_excel(DB_FILE, sheet_name='Inventario')
+        
+        try:
+            gastos_mensuales_df = pd.read_excel(DB_FILE, sheet_name='GastosMensuales')
+        except ValueError:
+            gastos_mensuales_df = pd.DataFrame(columns=['Sede', 'Mes', 'Tipo', 'Valor'])
+        
+        # Apply Sede Filter if provided
+        if sede_filter:
+             servicios_df = servicios_df[servicios_df['Sede'] == sede_filter]
+             productos_df = productos_df[productos_df['Sede'] == sede_filter]
+             gastos_df = gastos_df[gastos_df['Sede'] == sede_filter]
+             inventario_df = inventario_df[inventario_df['Sede'] == sede_filter]
+             gastos_mensuales_df = gastos_mensuales_df[gastos_mensuales_df['Sede'] == sede_filter]
+
+        # Filter by month
+        servicios_df['Fecha'] = pd.to_datetime(servicios_df['Fecha'])
+        productos_df['Fecha'] = pd.to_datetime(productos_df['Fecha'])
+        gastos_df['Fecha'] = pd.to_datetime(gastos_df['Fecha'])
+        
+        servicios_month = servicios_df[(servicios_df['Fecha'].dt.year == int(year)) & 
+                                       (servicios_df['Fecha'].dt.month == int(month))]
+        productos_month = productos_df[(productos_df['Fecha'].dt.year == int(year)) & 
+                                       (productos_df['Fecha'].dt.month == int(month))]
+        gastos_month = gastos_df[(gastos_df['Fecha'].dt.year == int(year)) & 
+                                 (gastos_df['Fecha'].dt.month == int(month))]
+        
+        # Gastos Mensuales (Fixed)
+        gastos_mensuales_month = gastos_mensuales_df[gastos_mensuales_df['Mes'] == month_filter]
+
+        # Calculate totals
+        total_ventas = servicios_month['Valor'].sum() + productos_month['Valor'].sum()
+        total_gastos = gastos_month['Valor'].sum()
+        total_nomina = servicios_month['Comision'].sum() + productos_month['Comision'].sum()
+        utilidad_operativa = total_ventas - total_gastos - total_nomina
+        
+        total_gastos_fijos = gastos_mensuales_month['Valor'].sum()
+        utilidad_real = utilidad_operativa - total_gastos_fijos
+        
+        # Nómina por estilista
+        nomina_servicios = servicios_month.groupby('Estilista')['Comision'].sum()
+        nomina_productos = productos_month.groupby('Estilista')['Comision'].sum()
+        nomina_por_estilista = (nomina_servicios.add(nomina_productos, fill_value=0)).to_dict()
+        
+        # Ventas por estilista
+        ventas_servicios = servicios_month.groupby('Estilista')['Valor'].sum()
+        ventas_productos = productos_month.groupby('Estilista')['Valor'].sum()
+        ventas_por_estilista = (ventas_servicios.add(ventas_productos, fill_value=0)).to_dict()
+        
+        # Inventario resumido - Agrupado por producto
+        inventario_agrupado = {}
+        for _, row in inventario_df.iterrows():
+            try:
+                producto = row['Producto'] if pd.notna(row['Producto']) else ''
+                if not producto:
+                    continue
+                    
+                cantidad = float(row['Cantidad']) if pd.notna(row['Cantidad']) else 0.0
+                valor = float(row['Valor']) if pd.notna(row['Valor']) else 0.0
+                unidad = row['Unidad'] if pd.notna(row['Unidad']) else ''
+                
+                # Si el producto ya existe, sumar las cantidades y valores
+                if producto in inventario_agrupado:
+                    inventario_agrupado[producto]['cantidad'] += cantidad
+                    inventario_agrupado[producto]['valor_total'] += cantidad * valor
+                else:
+                    inventario_agrupado[producto] = {
+                        'producto': producto,
+                        'cantidad': cantidad,
+                        'unidad': unidad,
+                        'valor_total': cantidad * valor
+                    }
+            except:
+                continue
+        
+        # Convertir el diccionario a lista
+        inventario_resumido = list(inventario_agrupado.values())
+            
+        # Yearly Sales Timeline
+        meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+        ventas_anuales = []
+        
+        for m in range(1, 13):
+            try:
+                s_month = servicios_df[(servicios_df['Fecha'].dt.year == int(year)) & 
+                                       (servicios_df['Fecha'].dt.month == m)]
+                p_month = productos_df[(productos_df['Fecha'].dt.year == int(year)) & 
+                                       (productos_df['Fecha'].dt.month == m)]
+                total = s_month['Valor'].sum() + p_month['Valor'].sum()
+                ventas_anuales.append(float(total))
+            except:
+                 ventas_anuales.append(0.0)
+            
+        # Top Servicios (Frecuencia)
+        top_servicios = servicios_month['Servicio'].value_counts().head(10).to_dict()
+        
+        # Estado Inventario
+        disponibles = 0
+        agotados = 0
+        for _, row in inventario_df.iterrows():
+            try:
+                qty = float(row['Cantidad']) if pd.notna(row['Cantidad']) else 0
+                if qty > 0:
+                    disponibles += 1
+                else:
+                    agotados += 1
+            except:
+                pass
+        
+        estado_inventario = {
+            'Disponibles': disponibles,
+            'Agotados': agotados
+        }
+        
+        return jsonify({
+            'status': 'success',
+            'data': {
+                'totales': {
+                    'ventas': float(total_ventas),
+                    'gastos': float(total_gastos),
+                    'nomina': float(total_nomina),
+                    'utilidad_operativa': float(utilidad_operativa),
+                    'gastos_fijos': float(total_gastos_fijos),
+                    'utilidad_real': float(utilidad_real)
+                },
+                'gastos_mensuales_detalle': gastos_mensuales_month[['Tipo', 'Valor']].to_dict(orient='records'),
+                'nomina_por_estilista': {k: float(v) for k, v in nomina_por_estilista.items()},
+                'ventas_por_estilista': {k: float(v) for k, v in ventas_por_estilista.items()},
+                'top_servicios': top_servicios,
+                'estado_inventario': estado_inventario,
+                'inventario': inventario_resumido,
+                'timeline': {
+                    'labels': meses,
+                    'data': ventas_anuales
+                }
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/appointment', methods=['POST'])
+def add_appointment():
+    try:
+        import uuid
+        data = request.json
+        sede = data.get('sede', 'Principal')
+        record = {
+            'ID': str(uuid.uuid4()),
+            'Sede': sede,
+            'Fecha': data['fecha'],
+            'Hora': data['hora'],
+            'Cliente': data['cliente'],
+            'Telefono': data['telefono'],
+            'Servicio': data['servicio'],
+            'Notas': data.get('notas', ''),
+            'Estado': 'Pendiente'
+        }
+        
+        if append_to_excel('Citas', record):
+            return jsonify({'status': 'success', 'message': 'Cita agendada correctamente'})
+        return jsonify({'status': 'error', 'message': 'Error al guardar la cita'}), 500
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/appointment/<appointment_id>', methods=['DELETE'])
+def delete_appointment(appointment_id):
+    try:
+        wb = openpyxl.load_workbook(DB_FILE)
+        ws = wb['Citas']
+        
+        # Find row by ID (assuming ID is in column 1)
+        row_to_delete = None
+        for row in range(2, ws.max_row + 1):
+            if str(ws.cell(row=row, column=1).value) == appointment_id:
+                row_to_delete = row
+                break
+        
+        if row_to_delete:
+            ws.delete_rows(row_to_delete)
+            wb.save(DB_FILE)
+            return jsonify({'status': 'success', 'message': 'Cita eliminada correctamente'})
+        else:
+            return jsonify({'status': 'error', 'message': 'Cita no encontrada'}), 404
+            
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/appointment/<appointment_id>', methods=['PUT'])
+def update_appointment(appointment_id):
+    try:
+        data = request.json
+        wb = openpyxl.load_workbook(DB_FILE)
+        ws = wb['Citas']
+        
+        # Find row by ID
+        row_to_update = None
+        for row in range(2, ws.max_row + 1):
+            if str(ws.cell(row=row, column=1).value) == appointment_id:
+                row_to_update = row
+                break
+        
+        if row_to_update:
+            # Map fields to columns (assuming order: ID, Fecha, Hora, Cliente, Telefono, Servicio, Notas, Estado)
+            # 1-based indexing
+            if 'fecha' in data: ws.cell(row=row_to_update, column=2, value=data['fecha'])
+            if 'hora' in data: ws.cell(row=row_to_update, column=3, value=data['hora'])
+            if 'cliente' in data: ws.cell(row=row_to_update, column=4, value=data['cliente'])
+            if 'telefono' in data: ws.cell(row=row_to_update, column=5, value=data['telefono'])
+            if 'servicio' in data: ws.cell(row=row_to_update, column=6, value=data['servicio'])
+            if 'notas' in data: ws.cell(row=row_to_update, column=7, value=data.get('notas', ''))
+            
+            wb.save(DB_FILE)
+            return jsonify({'status': 'success', 'message': 'Cita actualizada correctamente'})
+        else:
+            return jsonify({'status': 'error', 'message': 'Cita no encontrada'}), 404
+            
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/appointments', methods=['GET'])
+def get_appointments():
+    try:
+        date_filter = request.args.get('date')
+        sede_filter = request.args.get('sede', 'Principal')
+        
+        try:
+            df = pd.read_excel(DB_FILE, sheet_name='Citas')
+        except ValueError:
+            return jsonify({'status': 'success', 'data': []})
+            
+        df = df.fillna('')
+        
+        # Filter by sede
+        df = df[df['Sede'] == sede_filter]
+        
+        if date_filter:
+            # Ensure date comparison works regardless of format in Excel
+            # Assuming Excel stores dates as strings or datetime objects
+            df['Fecha'] = df['Fecha'].astype(str)
+            df = df[df['Fecha'] == date_filter]
+            
+        # Sort by Time
+        try:
+            df = df.sort_values('Hora')
+        except:
+            pass
+            
+        appointments = df.to_dict(orient='records')
+        return jsonify({'status': 'success', 'data': appointments})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/alerts', methods=['GET'])
+def get_alerts():
+    try:
+        today = datetime.now().strftime('%Y-%m-%d')
+        
+        try:
+            df = pd.read_excel(DB_FILE, sheet_name='Citas')
+        except ValueError:
+            return jsonify({'status': 'success', 'alerts': []})
+            
+        df = df.fillna('')
+        df['Fecha'] = df['Fecha'].astype(str)
+        
+        # Filter for today
+        today_appointments = df[df['Fecha'] == today]
+        
+        alerts = []
+        if not today_appointments.empty:
+            count = len(today_appointments)
+            alerts.append({
+                'type': 'info',
+                'message': f'Tienes {count} cita(s) programada(s) para hoy.'
+            })
+            
+        return jsonify({'status': 'success', 'alerts': alerts})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/monthly-expenses', methods=['POST'])
+@login_required
+def add_update_monthly_expenses():
+    try:
+        data = request.json
+        sede = data.get('sede', 'Principal')
+        mes = data.get('mes')  # YYYY-MM
+        expenses = data.get('expenses', [])  # List of {tipo: '...', valor: ...}
+        
+        if not mes or not expenses:
+             return jsonify({'status': 'error', 'message': 'Datos incompletos'}), 400
+
+        # Load existing data
+        try:
+            df = pd.read_excel(DB_FILE, sheet_name='GastosMensuales')
+        except ValueError:
+            df = pd.DataFrame(columns=['Sede', 'Mes', 'Tipo', 'Valor', 'Fecha_Registro'])
+
+        # Create a timestamp
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        # We want to replace existing entries for this Sede + Mes + Tipo, or append if new
+        for exp in expenses:
+            tipo = exp['tipo']
+            valor = float(exp['valor'])
+            
+            # Check if exists
+            mask = (df['Sede'] == sede) & (df['Mes'] == mes) & (df['Tipo'] == tipo)
+            
+            if mask.any():
+                # Update
+                idx = df.index[mask].tolist()[0]
+                df.at[idx, 'Valor'] = valor
+                df.at[idx, 'Fecha_Registro'] = now
+            else:
+                # Add new
+                new_row = {
+                    'Sede': sede,
+                    'Mes': mes,
+                    'Tipo': tipo,
+                    'Valor': valor,
+                    'Fecha_Registro': now
+                }
+                df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+
+        with pd.ExcelWriter(DB_FILE, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+            df.to_excel(writer, sheet_name='GastosMensuales', index=False)
+            
+        return jsonify({'status': 'success', 'message': 'Gastos mensuales guardados correctamentos'})
+
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/monthly-expenses', methods=['GET'])
+@login_required
+def get_monthly_expenses():
+    try:
+        sede = request.args.get('sede', 'Principal')
+        mes = request.args.get('mes') # YYYY-MM
+        
+        try:
+            df = pd.read_excel(DB_FILE, sheet_name='GastosMensuales')
+        except ValueError:
+            return jsonify({'status': 'success', 'data': []})
+            
+        df = df.fillna('')
+        
+        # Filter
+        if mes:
+            df = df[(df['Sede'] == sede) & (df['Mes'] == mes)]
+        else:
+             df = df[df['Sede'] == sede]
+             
+        data = df.to_dict(orient='records')
+        return jsonify({'status': 'success', 'data': data})
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+if __name__ == '__main__':
+    init_db()
+    app.run(debug=True)
