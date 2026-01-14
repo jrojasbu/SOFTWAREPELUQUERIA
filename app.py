@@ -274,7 +274,13 @@ def save_stylists(stylists):
 def get_services():
     try:
         with open(SERVICES_FILE, 'r') as f:
-            return json.load(f)
+            data = json.load(f)
+            # Migration check: if list of strings, convert to objects
+            if data and isinstance(data[0], str):
+                new_data = [{'name': s, 'value': 0} for s in data]
+                save_services(new_data)
+                return new_data
+            return data
     except:
         return []
 
@@ -360,11 +366,14 @@ def delete_stylist():
 @login_required
 def add_service_item():
     data = request.json
-    new_service = data.get('name')
-    if new_service:
+    new_service_name = data.get('name')
+    new_service_value = float(data.get('value', 0))
+    
+    if new_service_name:
         services = get_services()
-        if new_service not in services:
-            services.append(new_service)
+        # Check if exists by name
+        if not any(s['name'] == new_service_name for s in services):
+            services.append({'name': new_service_name, 'value': new_service_value})
             save_services(services)
             return jsonify({'status': 'success', 'message': 'Servicio agregado'})
         return jsonify({'status': 'error', 'message': 'El servicio ya existe'})
@@ -376,9 +385,12 @@ def delete_service_item():
     data = request.json
     name_to_delete = data.get('name')
     services = get_services()
-    if name_to_delete in services:
-        services.remove(name_to_delete)
-        save_services(services)
+    
+    # Filter out the service with the given name
+    new_services = [s for s in services if s['name'] != name_to_delete]
+    
+    if len(new_services) < len(services):
+        save_services(new_services)
         return jsonify({'status': 'success', 'message': 'Servicio eliminado'})
     return jsonify({'status': 'error', 'message': 'Servicio no encontrado'})
 
@@ -418,7 +430,7 @@ def delete_sede():
 
 def calculate_commission(stylist, service, value):
     service_lower = service.lower()
-    is_special_service = 'tinte' in service_lower or 'mechas' in service_lower
+    is_special_service = 'tinte' in service_lower or 'mechas' in service_lower or 'keratina' in service_lower
     
     if 'monica' in stylist.lower():
         if is_special_service:
@@ -662,7 +674,7 @@ def get_summary():
         # Read Services
         try:
             df_services = pd.read_excel(DB_FILE, sheet_name='Servicios')
-            for _, row in df_services.iterrows():
+            for idx, row in df_services.iterrows():
                 if str(row['Fecha']).startswith(date_filter) and row['Sede'] == sede_filter:
                     val = float(row['Valor']) if pd.notna(row['Valor']) else 0.0
                     com = float(row['Comision']) if pd.notna(row['Comision']) else 0.0
@@ -672,6 +684,8 @@ def get_summary():
                         metodo = 'N/A'
                         
                     summary_data.append({
+                        'id': int(idx),
+                        'sheet': 'Servicios',
                         'estilista': row['Estilista'],
                         'descripcion': row['Servicio'],
                         'valor': val,
@@ -687,7 +701,7 @@ def get_summary():
         # Read Products
         try:
             df_products = pd.read_excel(DB_FILE, sheet_name='Productos')
-            for _, row in df_products.iterrows():
+            for idx, row in df_products.iterrows():
                 if str(row['Fecha']).startswith(date_filter) and row['Sede'] == sede_filter:
                     val = float(row['Valor']) if pd.notna(row['Valor']) else 0.0
                     com = float(row['Comision']) if pd.notna(row['Comision']) else 0.0
@@ -697,6 +711,8 @@ def get_summary():
                         metodo = 'N/A'
 
                     summary_data.append({
+                        'id': int(idx),
+                        'sheet': 'Productos',
                         'estilista': row['Estilista'],
                         'descripcion': row['Producto'],
                         'valor': val,
@@ -732,6 +748,42 @@ def get_summary():
                 'utilidad': utilidad
             }
         })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/summary/update', methods=['POST'])
+@login_required
+def update_summary_item():
+    try:
+        data = request.json
+        sheet_name = data.get('sheet')
+        try:
+            row_id = int(data.get('id'))
+            new_valor = float(data.get('valor'))
+            new_comision = float(data.get('comision'))
+        except (ValueError, TypeError):
+             return jsonify({'status': 'error', 'message': 'Invalid numeric data'}), 400
+        
+        if sheet_name not in ['Servicios', 'Productos']:
+            return jsonify({'status': 'error', 'message': 'Invalid sheet'}), 400
+            
+        # Read the dataframe
+        df = pd.read_excel(DB_FILE, sheet_name=sheet_name)
+        
+        # Verify index exists
+        if row_id not in df.index:
+            return jsonify({'status': 'error', 'message': 'Item not found'}), 404
+            
+        # Update values
+        df.at[row_id, 'Valor'] = new_valor
+        df.at[row_id, 'Comision'] = new_comision
+        
+        # Save back
+        with pd.ExcelWriter(DB_FILE, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
+            
+        return jsonify({'status': 'success', 'message': 'Item actualizado'})
+            
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -1102,21 +1154,40 @@ def get_appointments():
             
         df = df.fillna('')
         
-        # Filter by sede
-        df = df[df['Sede'] == sede_filter]
+        # Robust Sede filtering
+        if 'Sede' in df.columns:
+            # Convert to string and strip whitespace for robust comparison
+            df['Sede'] = df['Sede'].astype(str).str.strip()
+            df = df[df['Sede'] == sede_filter]
         
         if date_filter:
-            # Ensure date comparison works regardless of format in Excel
-            # Assuming Excel stores dates as strings or datetime objects
-            df['Fecha'] = df['Fecha'].astype(str)
-            df = df[df['Fecha'] == date_filter]
+            # Robust Date filtering
+            # Convert both column and filter to datetime to compare
+            try:
+                # Convert column to datetime, coerce errors to NaT
+                df['Fecha_DT'] = pd.to_datetime(df['Fecha'], errors='coerce')
+                
+                # Create filter date object
+                filter_date = pd.to_datetime(date_filter)
+                
+                # Filter rows where valid dates match
+                # Check where expected format matches YYYY-MM-DD
+                df = df[df['Fecha_DT'].dt.strftime('%Y-%m-%d') == filter_date.strftime('%Y-%m-%d')]
+            except Exception as e:
+                # Fallback to string comparison if datetime conversion fails completely
+                df['Fecha'] = df['Fecha'].astype(str).str.strip()
+                df = df[df['Fecha'] == date_filter]
             
         # Sort by Time
         try:
             df = df.sort_values('Hora')
         except:
             pass
-            
+
+        # Cleanup temporary column before conversion
+        if 'Fecha_DT' in df.columns:
+            df = df.drop(columns=['Fecha_DT'])
+
         appointments = df.to_dict(orient='records')
         return jsonify({'status': 'success', 'data': appointments})
     except Exception as e:
@@ -1231,4 +1302,4 @@ def get_monthly_expenses():
 
 if __name__ == '__main__':
     init_db()
-    app.run(debug=True)
+    app.run(host='0.0.0.0', debug=True)

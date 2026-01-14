@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
 </head>
 
 <body>
@@ -69,7 +70,8 @@
                         <select name="servicio" required>
                             <option value="" disabled selected>Seleccione un servicio</option>
                             {% for service in services %}
-                            <option value="{{ service }}">{{ service }}</option>
+                            <option value="{{ service.name }}" data-price="{{ service.value }}">{{ service.name }}
+                            </option>
                             {% endfor %}
                         </select>
                     </div>
@@ -118,7 +120,7 @@
                                 <select name="servicio" required>
                                     <option value="" disabled selected>Seleccione un servicio</option>
                                     {% for service in services %}
-                                    <option value="{{ service }}">{{ service }}</option>
+                                    <option value="{{ service.name }}">{{ service.name }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
@@ -349,13 +351,19 @@
                         <select id="filterService" onchange="applyFilters()">
                             <option value="">Todos</option>
                             {% for service in services %}
-                            <option value="{{ service }}">{{ service }}</option>
+                            <option value="{{ service.name }}" data-price="{{ service.value }}">{{ service.name }}
+                            </option>
                             {% endfor %}
                         </select>
                     </div>
                 </div>
 
                 <div id="paymentSubtotals" class="payment-subtotals">
+                    <!-- Populated by JS -->
+                </div>
+
+                <div id="cashSufficiencyIndicator" class="sufficiency-card"
+                    style="display: none; margin-bottom: 1rem; padding: 1rem; border-radius: 8px; font-weight: bold; text-align: center;">
                     <!-- Populated by JS -->
                 </div>
 
@@ -368,6 +376,7 @@
                                 <th>Valor</th>
                                 <th>Comisión</th>
                                 <th>Método Pago</th>
+                                <th>Acciones</th>
                             </tr>
                         </thead>
                         <tbody id="summaryBody">
@@ -378,15 +387,15 @@
                                 <td colspan="2">TOTAL VENTAS</td>
                                 <td id="totalValue">$0</td>
                                 <td id="totalCommission">$0</td>
-                                <td></td>
+                                <td colspan="2"></td>
                             </tr>
                             <tr class="total-row">
                                 <td colspan="2">TOTAL GASTOS</td>
-                                <td id="totalExpenses" colspan="3">$0</td>
+                                <td id="totalExpenses" colspan="4">$0</td>
                             </tr>
                             <tr class="total-row profit-row">
                                 <td colspan="2">UTILIDAD</td>
-                                <td id="totalProfit" colspan="3">$0</td>
+                                <td id="totalProfit" colspan="4">$0</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -422,6 +431,7 @@
                         <p class="stat-value" id="statsNomina">$0</p>
                     </div>
                     <div class="stat-card">
+                        <h3>Utilidad</h3>
                         <p class="stat-value" id="statsUtilidad">$0</p>
                     </div>
                     <div class="stat-card"
@@ -545,15 +555,18 @@
                         <div class="input-group">
                             <input type="text" name="name" placeholder="Nombre del nuevo servicio" required>
                         </div>
-                        <button type="submit" class="submit-btn">Agregar</button>
+                        <div class="input-group">
+                            <input type="number" name="value" placeholder="Valor sugerido ($)" required>
+                        </div>
+                        <button type="submit" class="submit-btn" style="width:100%">Agregar</button>
                     </form>
 
                     <h3 style="margin-top: 2rem;">Lista de Servicios</h3>
                     <ul class="stylist-list">
                         {% for service in services %}
                         <li class="stylist-item">
-                            <span>{{ service }}</span>
-                            <button class="delete-btn" onclick="deleteService('{{ service }}')">Eliminar</button>
+                            <span>{{ service.name }} - ${{ service.value | round | int }}</span>
+                            <button class="delete-btn" onclick="deleteService('{{ service.name }}')">Eliminar</button>
                         </li>
                         {% endfor %}
                     </ul>

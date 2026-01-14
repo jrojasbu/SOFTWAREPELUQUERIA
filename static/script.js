@@ -147,6 +147,9 @@ function applyFilters() {
             <td>$${item.valor.toLocaleString()}</td>
             <td>$${item.comision.toLocaleString()}</td>
             <td><span class="payment-badge">${item.metodo_pago}</span></td>
+            <td>
+                <button class="edit-btn" onclick="enableEdit(this, '${item.sheet}', ${item.id}, ${item.valor}, ${item.comision})" style="background:none; border:none; cursor:pointer;" title="Editar">✏️</button>
+            </td>
         `;
         tbody.appendChild(row);
     });
@@ -170,6 +173,26 @@ function applyFilters() {
                 <span class="payment-total">$${total.toLocaleString()}</span>
             `;
             paymentSubtotalsDiv.appendChild(card);
+        }
+    }
+
+    // Check cash sufficiency for commissions
+    const cashTotal = paymentTotals['Efectivo'] || 0;
+    const sufficiencyDiv = document.getElementById('cashSufficiencyIndicator');
+
+    if (sufficiencyDiv) {
+        sufficiencyDiv.style.display = 'block';
+        if (cashTotal >= totalComision) {
+            sufficiencyDiv.textContent = `Efectivo Suficiente para Comisiones (Sobran $${(cashTotal - totalComision).toLocaleString()})`;
+            sufficiencyDiv.style.background = 'rgba(16, 185, 129, 0.2)';
+            sufficiencyDiv.style.border = '1px solid rgba(16, 185, 129, 0.4)';
+            sufficiencyDiv.style.color = '#34d399';
+        } else {
+            const deficit = totalComision - cashTotal;
+            sufficiencyDiv.textContent = `Efectivo INSUFICIENTE para Comisiones (Faltan $${deficit.toLocaleString()})`;
+            sufficiencyDiv.style.background = 'rgba(239, 68, 68, 0.2)';
+            sufficiencyDiv.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+            sufficiencyDiv.style.color = '#f87171';
         }
     }
 }
@@ -452,6 +475,10 @@ document.getElementById('inventoryForm').addEventListener('submit', async (e) =>
 
 
 async function loadStatistics() {
+    // Register the plugin if available
+    if (typeof ChartDataLabels !== 'undefined') {
+        Chart.register(ChartDataLabels);
+    }
     const monthInput = document.getElementById('statsMonth');
     let selectedMonth = monthInput.value;
 
@@ -500,12 +527,12 @@ async function loadStatistics() {
                     datasets: [{
                         data: Object.values(data.nomina_por_estilista),
                         backgroundColor: [
-                            'rgba(255, 99, 132, 0.7)',
-                            'rgba(54, 162, 235, 0.7)',
-                            'rgba(255, 206, 86, 0.7)',
-                            'rgba(75, 192, 192, 0.7)',
-                            'rgba(153, 102, 255, 0.7)',
-                            'rgba(255, 159, 64, 0.7)'
+                            '#63ecf1', // Cyan (Primary)
+                            '#325ff3', // Blue (Secondary)
+                            '#ec4899', // Pink (Accent)
+                            '#d4af37', // Gold (Accent)
+                            '#8b5cf6', // Purple (Accent)
+                            '#10b981'  // Green (Success)
                         ],
                         borderColor: 'rgba(255, 255, 255, 0.1)',
                         borderWidth: 1
@@ -514,7 +541,19 @@ async function loadStatistics() {
                 options: {
                     responsive: true,
                     plugins: {
-                        legend: { position: 'bottom', labels: { color: '#cbd5e1' } }
+                        legend: { position: 'bottom', labels: { color: '#cbd5e1' } },
+                        datalabels: {
+                            color: '#fff',
+                            display: function (context) {
+                                return context.dataset.data[context.dataIndex] > 0;
+                            },
+                            font: {
+                                weight: 'bold'
+                            },
+                            formatter: (value) => {
+                                return '$' + value.toLocaleString();
+                            }
+                        }
                     }
                 }
             });
@@ -535,19 +574,30 @@ async function loadStatistics() {
                     datasets: [{
                         label: 'Ventas por Estilista',
                         data: salesData,
-                        backgroundColor: 'rgba(99, 236, 241, 0.6)',
+                        backgroundColor: '#63ecf1',
                         borderColor: '#63ecf1',
                         borderWidth: 1
                     }]
                 },
                 options: {
                     responsive: true,
+                    layout: {
+                        padding: {
+                            top: 25
+                        }
+                    },
                     scales: {
                         y: { beginAtZero: true, ticks: { color: '#cbd5e1' }, grid: { color: 'rgba(255, 255, 255, 0.1)' } },
                         x: { ticks: { color: '#cbd5e1' }, grid: { display: false } }
                     },
                     plugins: {
-                        legend: { display: false }
+                        legend: { display: false },
+                        datalabels: {
+                            color: '#cbd5e1',
+                            anchor: 'end',
+                            align: 'top',
+                            formatter: (value) => '$' + value.toLocaleString()
+                        }
                     }
                 }
             });
@@ -571,12 +621,22 @@ async function loadStatistics() {
                 },
                 options: {
                     responsive: true,
+                    layout: {
+                        padding: {
+                            top: 20
+                        }
+                    },
                     scales: {
                         y: { beginAtZero: true, ticks: { color: '#cbd5e1' }, grid: { color: 'rgba(255, 255, 255, 0.1)' } },
                         x: { ticks: { color: '#cbd5e1' }, grid: { color: 'rgba(255, 255, 255, 0.05)' } }
                     },
                     plugins: {
-                        legend: { labels: { color: '#cbd5e1' } }
+                        legend: { labels: { color: '#cbd5e1' } },
+                        datalabels: {
+                            color: '#cbd5e1',
+                            align: 'top',
+                            formatter: (value) => '$' + value.toLocaleString()
+                        }
                     }
                 }
             });
@@ -600,19 +660,29 @@ async function loadStatistics() {
                         datasets: [{
                             label: 'Cantidad de Servicios',
                             data: servicesData,
-                            backgroundColor: 'rgba(255, 99, 132, 0.6)',
-                            borderColor: '#ff6384',
+                            backgroundColor: '#ec4899',
+                            borderColor: '#ec4899',
                             borderWidth: 1
                         }]
                     },
                     options: {
                         responsive: true,
+                        layout: {
+                            padding: {
+                                right: 30
+                            }
+                        },
                         scales: {
                             x: { beginAtZero: true, ticks: { color: '#cbd5e1' }, grid: { color: 'rgba(255, 255, 255, 0.1)' } },
                             y: { ticks: { color: '#cbd5e1' }, grid: { display: false } }
                         },
                         plugins: {
-                            legend: { display: false }
+                            legend: { display: false },
+                            datalabels: {
+                                color: '#cbd5e1',
+                                anchor: 'end',
+                                align: 'right'
+                            }
                         }
                     }
                 });
@@ -688,6 +758,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // Check alerts on load
     checkAlerts();
     loadAppointments();
+
+    // Auto-fill price on service selection
+    const serviceSelect = document.querySelector('select[name="servicio"]');
+    if (serviceSelect) {
+        serviceSelect.addEventListener('change', function () {
+            const selectedOption = this.options[this.selectedIndex];
+            const price = selectedOption.getAttribute('data-price');
+            const priceInput = document.querySelector('input[name="valor"]');
+
+            if (price && priceInput) {
+                priceInput.value = price;
+            }
+        });
+    }
 
     // Restore last selected sede from localStorage
     const savedSede = localStorage.getItem('currentSede');
@@ -902,6 +986,8 @@ document.getElementById('appointmentForm').addEventListener('submit', async (e) 
     const form = e.target;
     const formData = new FormData(form);
     const data = Object.fromEntries(formData.entries());
+    // Fix: Include current sede in the data
+    data.sede = getCurrentSede();
 
     try {
         let url = '/api/appointment';
@@ -1108,6 +1194,74 @@ async function saveMonthlyExpenses(event) {
 
         if (result.status === 'success') {
             showNotification(result.message);
+        } else {
+            showNotification(result.message, true);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showNotification('Error de conexión', true);
+    }
+}
+
+// Inline Editing Functions
+function enableEdit(btn, sheet, id, valor, comision) {
+    const row = btn.closest('tr');
+    const valorCell = row.cells[2];
+    const comisionCell = row.cells[3];
+    const actionCell = row.cells[5];
+
+    // Store original values
+    valorCell.dataset.original = valor;
+    comisionCell.dataset.original = comision;
+    actionCell.dataset.originalHTML = actionCell.innerHTML;
+
+    valorCell.innerHTML = `<input type="number" class="edit-input" value="${valor}" step="0.01" style="width: 80px; padding: 4px; border-radius: 4px; border: 1px solid #ccc; color: #000;">`;
+    comisionCell.innerHTML = `<input type="number" class="edit-input" value="${comision}" step="0.01" style="width: 80px; padding: 4px; border-radius: 4px; border: 1px solid #ccc; color: #000;">`;
+
+    actionCell.innerHTML = `
+        <button class="save-btn" onclick="saveEdit(this, '${sheet}', ${id})" style="background:none; border:none; cursor:pointer; margin-right: 5px;" title="Guardar">💾</button>
+        <button class="cancel-btn" onclick="cancelEdit(this)" style="background:none; border:none; cursor:pointer;" title="Cancelar">❌</button>
+    `;
+}
+
+function cancelEdit(btn) {
+    const row = btn.closest('tr');
+    const valorCell = row.cells[2];
+    const comisionCell = row.cells[3];
+    const actionCell = row.cells[5];
+
+    valorCell.innerHTML = `$${parseFloat(valorCell.dataset.original).toLocaleString()}`;
+    comisionCell.innerHTML = `$${parseFloat(comisionCell.dataset.original).toLocaleString()}`;
+    actionCell.innerHTML = actionCell.dataset.originalHTML;
+}
+
+async function saveEdit(btn, sheet, id) {
+    const row = btn.closest('tr');
+    const valorInput = row.cells[2].querySelector('input');
+    const comisionInput = row.cells[3].querySelector('input');
+
+    const newValor = valorInput.value;
+    const newComision = comisionInput.value;
+
+    try {
+        const response = await fetch('/api/summary/update', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                sheet: sheet,
+                id: id,
+                valor: newValor,
+                comision: newComision
+            }),
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            showNotification(result.message);
+            loadSummary(); // Reload to update totals
         } else {
             showNotification(result.message, true);
         }
