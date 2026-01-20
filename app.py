@@ -18,10 +18,24 @@ SERVICES_FILE = 'services.json'
 SEDES_FILE = 'sedes.json'
 USERS_FILE = 'users.json'
 
+@app.errorhandler(500)
+def internal_error(error):
+    if request.path.startswith('/api/'):
+        return jsonify({'status': 'error', 'message': 'Error interno del servidor. Verifique los logs.'}), 500
+    return "Error interno del servidor", 500
+
+@app.errorhandler(404)
+def not_found_error(error):
+    if request.path.startswith('/api/'):
+        return jsonify({'status': 'error', 'message': 'Recurso no encontrado'}), 404
+    return "Página no encontrada", 404
+
 def login_required(view):
     @functools.wraps(view)
     def wrapped_view(**kwargs):
         if 'user_id' not in session:
+            if request.path.startswith('/api/'):
+                return jsonify({'status': 'error', 'message': 'Sesión expirada. Por favor recargue la página.'}), 401
             return redirect(url_for('login'))
         return view(**kwargs)
     return wrapped_view
@@ -335,6 +349,11 @@ def index():
     services = get_services()
     sedes = get_sedes()
     return render_template('index.html', stylists=stylists, services=services, sedes=sedes)
+
+@app.route('/certificado')
+@login_required
+def view_certificate():
+    return render_template('certificado.html')
 
 @app.route('/api/stylist', methods=['POST'])
 @login_required

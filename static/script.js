@@ -256,7 +256,21 @@ async function handleFormSubmit(event, url) {
             body: JSON.stringify(data),
         });
 
-        const result = await response.json();
+        // Handle non-ok responses that might still be JSON
+        if (response.status === 401) {
+            showNotification('Sesión expirada. Recargando...', true);
+            setTimeout(() => window.location.reload(), 2000);
+            return;
+        }
+
+        let result;
+        const text = await response.text();
+        try {
+            result = JSON.parse(text);
+        } catch (e) {
+            console.error('SERVER RESPONSE NOT JSON:', text);
+            throw new Error(`Respuesta del servidor inválida (${response.status})`);
+        }
 
         if (result.status === 'success') {
             let msg = result.message;
@@ -270,7 +284,7 @@ async function handleFormSubmit(event, url) {
         }
     } catch (error) {
         console.error('Error:', error);
-        showNotification('Error de conexión', true);
+        showNotification('Error: ' + error.message, true);
     }
 }
 
