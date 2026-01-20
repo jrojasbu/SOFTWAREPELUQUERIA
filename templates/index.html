@@ -477,6 +477,40 @@
                     <canvas id="timelineChart"></canvas>
                 </div>
 
+                <div class="chart-wrapper"
+                    style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 12px; margin-bottom: 2rem; border-left: 4px solid #d4af37;">
+                    <h3 style="text-align: center; margin-bottom: 0.5rem;">🔮 Predicción de Ingresos (Próximos 7 Días)
+                    </h3>
+                    <p style="text-align: center; color: #94a3b8; font-size: 0.85rem; margin-bottom: 1.5rem;">Basado en
+                        los últimos 60 días de actividad</p>
+                    <canvas id="predictionChart"></canvas>
+                    <div id="predictionSummary"
+                        style="margin-top: 1rem; color: #cbd5e1; font-size: 0.9rem; background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 8px; display: none;">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <div class="chart-wrapper"
+                    style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 12px; margin-bottom: 2rem; border-left: 4px solid #ec4899;">
+                    <h3 style="text-align: center; margin-bottom: 0.5rem;">👥 Flujo de Clientes y Patrones Semanales
+                    </h3>
+                    <p style="text-align: center; color: #94a3b8; font-size: 0.85rem; margin-bottom: 1.5rem;">Análisis
+                        de recurrencia y proyección de demanda</p>
+                    <div
+                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem;">
+                        <div style="min-height: 350px;">
+                            <h4 style="text-align: center; color: #cbd5e1; margin-bottom: 1rem; font-size: 0.9rem;">
+                                Proyección de Visitas</h4>
+                            <canvas id="customerFlowChart"></canvas>
+                        </div>
+                        <div style="min-height: 350px;">
+                            <h4 style="text-align: center; color: #cbd5e1; margin-bottom: 1rem; font-size: 0.9rem;">Días
+                                Fuertes vs Débiles</h4>
+                            <canvas id="customerPatternsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
                 <h3>Nómina por Estilista</h3>
                 <div class="table-container">
                     <table class="summary-table">

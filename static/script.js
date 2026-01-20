@@ -66,6 +66,9 @@ let payrollChart;
 let salesChart;
 let timelineChart;
 let servicesChart;
+let predictionChart;
+let customerFlowChart;
+let customerPatternsChart;
 
 async function loadSummary() {
     try {
@@ -742,6 +745,303 @@ async function loadStatistics() {
     } catch (error) {
         console.error('Error:', error);
         showNotification('Error al cargar estadísticas', true);
+    }
+
+    // Load prediction chart independently
+    loadPredictionChart();
+    loadCustomerFlowChart();
+}
+
+async function loadCustomerFlowChart() {
+    const sede = getCurrentSede();
+    try {
+        const response = await fetch(`/api/customer-flow?sede=${sede}`);
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            console.log('Customer flow API result:', result);
+            if (!result.historical || result.historical.length === 0) {
+                console.warn('No customer flow data available');
+                return;
+            }
+            const flowCtx = document.getElementById('customerFlowChart').getContext('2d');
+            const patternCtx = document.getElementById('customerPatternsChart').getContext('2d');
+
+            if (customerFlowChart) customerFlowChart.destroy();
+            if (customerPatternsChart) customerPatternsChart.destroy();
+
+            // 1. Customer Flow & Prediction Chart
+            const histLabels = result.historical.map(d => d.fecha);
+            const histData = result.historical.map(d => d.valor);
+            const predLabels = result.prediction ? result.prediction.map(d => d.fecha) : [];
+            const predData = result.prediction ? result.prediction.map(d => d.valor) : [];
+
+            const allLabels = [...histLabels, ...predLabels];
+            const histDataset = [...histData];
+            for (let i = 0; i < predData.length; i++) histDataset.push(null);
+
+            const predictionDataset = new Array(Math.max(0, histData.length - 1)).fill(null);
+            if (histData.length > 0) {
+                predictionDataset.push(histData[histData.length - 1]);
+            }
+            predData.forEach(v => predictionDataset.push(v));
+
+            customerFlowChart = new Chart(flowCtx, {
+                type: 'line',
+                data: {
+                    labels: allLabels,
+                    datasets: [
+                        {
+                            label: 'Clientes Reales',
+                            data: histDataset,
+                            borderColor: '#ec4899',
+                            backgroundColor: 'rgba(236, 72, 153, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 2
+                        },
+                        {
+                            label: 'Proyección (Proxy)',
+                            data: predictionDataset,
+                            borderColor: '#cbd5e1',
+                            borderDash: [5, 5],
+                            tension: 0.4,
+                            pointRadius: 3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, ticks: { color: '#94a3b8', stepSize: 1 }, grid: { color: 'rgba(255, 255, 255, 0.05)' } },
+                        x: { ticks: { color: '#94a3b8', autoSkip: true, maxTicksLimit: 10 }, grid: { display: false } }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#cbd5e1' } },
+                        datalabels: { display: false }
+                    }
+                }
+            });
+
+            // 2. Day of Week Patterns Chart
+            const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+            const patternData = days.map(day => result.patterns[day] || 0);
+
+            // Highlight strong and weak days
+            const maxVal = Math.max(...patternData);
+            const minVal = Math.min(...patternData);
+
+            const backgroundColors = patternData.map(val => {
+                if (val === maxVal) return '#ec4899'; // Strongest
+                if (val === minVal) return '#f87171'; // Weakest
+                return 'rgba(236, 72, 153, 0.4)';
+            });
+
+            customerPatternsChart = new Chart(patternCtx, {
+                type: 'bar',
+                data: {
+                    labels: days,
+                    datasets: [{
+                        label: 'Promedio Clientes/Día',
+                        data: patternData,
+                        backgroundColor: backgroundColors,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255, 255, 255, 0.05)' } },
+                        x: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => `Promedio: ${context.parsed.y.toFixed(1)} clientes`
+                            }
+                        },
+                        datalabels: {
+                            color: '#fff',
+                            anchor: 'end',
+                            align: 'top',
+                            formatter: (val) => val.toFixed(1)
+                        }
+                    }
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error loading customer flow:', error);
+    }
+}
+
+async function loadPredictionChart() {
+    const sede = getCurrentSede();
+    try {
+        const response = await fetch(`/api/prediction?sede=${sede}`);
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            const ctx = document.getElementById('predictionChart').getContext('2d');
+            if (predictionChart) predictionChart.destroy();
+
+            const histLabels = result.historical.map(d => d.fecha);
+            const histData = result.historical.map(d => d.valor);
+
+            const predLabels = result.prediction ? result.prediction.map(d => d.fecha) : [];
+            const predData = result.prediction ? result.prediction.map(d => d.valor) : [];
+
+            // Combine labels for X-axis
+            const allLabels = [...histLabels, ...predLabels];
+
+            // Prepare historical data with nulls for prediction range
+            const histDataset = [...histData];
+            for (let i = 0; i < predData.length; i++) histDataset.push(null);
+
+            // Prepare prediction data with nulls for historical range
+            // We want the prediction line to start from the last historical point
+            const predictionDataset = new Array(Math.max(0, histData.length - 1)).fill(null);
+            if (histData.length > 0) {
+                predictionDataset.push(histData[histData.length - 1]); // Connect last hist to first pred
+            }
+            predData.forEach(v => predictionDataset.push(v));
+
+            predictionChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: allLabels,
+                    datasets: [
+                        {
+                            label: 'Ingresos Históricos',
+                            data: histDataset,
+                            borderColor: '#325ff3',
+                            backgroundColor: 'rgba(50, 95, 243, 0.1)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 2,
+                            pointHoverRadius: 5
+                        },
+                        {
+                            label: 'Predicción 7 Días',
+                            data: predictionDataset,
+                            borderColor: '#d4af37',
+                            backgroundColor: 'rgba(212, 175, 55, 0.1)',
+                            borderWidth: 3,
+                            borderDash: [5, 5],
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#d4af37',
+                            pointHoverRadius: 7
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                color: '#94a3b8',
+                                callback: (value) => '$' + value.toLocaleString()
+                            },
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                        },
+                        x: {
+                            ticks: {
+                                color: '#94a3b8',
+                                maxRotation: 45,
+                                minRotation: 45,
+                                autoSkip: true,
+                                maxTicksLimit: 15
+                            },
+                            grid: { display: false }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: { color: '#cbd5e1', usePointStyle: true }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) label += ': ';
+                                    if (context.parsed.y !== null) {
+                                        label += '$' + context.parsed.y.toLocaleString();
+                                    }
+                                    return label;
+                                }
+                            }
+                        },
+                        datalabels: {
+                            display: false // Too many points for datalabels
+                        }
+                    }
+                }
+            });
+
+            // Update Summary
+            const summaryDiv = document.getElementById('predictionSummary');
+            if (summaryDiv) {
+                summaryDiv.style.display = 'block';
+
+                const peak = Math.max(...histData);
+                const dip = Math.min(...histData);
+                const avg = histData.reduce((a, b) => a + b, 0) / histData.length;
+
+                const peakIndex = histData.indexOf(peak);
+                const dipIndex = histData.indexOf(dip);
+
+                const peakDate = peakIndex !== -1 ? result.historical[peakIndex].fecha : 'N/A';
+                const dipDate = dipIndex !== -1 ? result.historical[dipIndex].fecha : 'N/A';
+
+                let trendIcon = '➡️';
+                let trendText = 'estable';
+                let trendColor = '#94a3b8';
+
+                if (result.trend === 'up') {
+                    trendIcon = '📈';
+                    trendText = 'ALCISTA';
+                    trendColor = '#34d399';
+                } else if (result.trend === 'down') {
+                    trendIcon = '📉';
+                    trendText = 'BAJISTA';
+                    trendColor = '#f87171';
+                }
+
+                summaryDiv.innerHTML = `
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
+                        <div>
+                            <p style="color: #94a3b8; margin-bottom: 0.2rem;">Tendencia:</p>
+                            <p style="color: ${trendColor}; font-weight: bold;">${trendIcon} ${trendText}</p>
+                        </div>
+                        <div>
+                            <p style="color: #94a3b8; margin-bottom: 0.2rem;">Pico (Máximo):</p>
+                            <p style="color: #63ecf1;">$${peak.toLocaleString()} <span style="font-size: 0.75rem; color: #64748b;">(${peakDate})</span></p>
+                        </div>
+                        <div>
+                            <p style="color: #94a3b8; margin-bottom: 0.2rem;">Caída (Mínimo):</p>
+                            <p style="color: #f87171;">$${dip.toLocaleString()} <span style="font-size: 0.75rem; color: #64748b;">(${dipDate})</span></p>
+                        </div>
+                        <div>
+                            <p style="color: #94a3b8; margin-bottom: 0.2rem;">Promedio Diario:</p>
+                            <p style="color: #cbd5e1;">$${Math.round(avg).toLocaleString()}</p>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+    } catch (error) {
+        console.error('Error loading prediction:', error);
     }
 }
 

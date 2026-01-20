@@ -1349,6 +1349,286 @@ def get_monthly_expenses():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+@app.route('/api/prediction', methods=['GET'])
+@login_required
+def get_prediction():
+    try:
+        sede_filter = request.args.get('sede', 'Principal')
+        
+        # Load data
+        df_servicios = pd.read_excel(DB_FILE, sheet_name='Servicios')
+        df_productos = pd.read_excel(DB_FILE, sheet_name='Productos')
+        
+        # Filter by sede
+        df_servicios = df_servicios[df_servicios['Sede'] == sede_filter]
+        df_productos = df_productos[df_productos['Sede'] == sede_filter]
+        
+        # Convert Fecha to datetime and floor to date
+        df_servicios['Fecha'] = pd.to_datetime(df_servicios['Fecha']).dt.date
+        df_productos['Fecha'] = pd.to_datetime(df_productos['Fecha']).dt.date
+        
+        # Aggregate by date
+        daily_servicios = df_servicios.groupby('Fecha')['Valor'].sum()
+        daily_productos = df_productos.groupby('Fecha')['Valor'].sum()
+        
+        # Combine
+        daily_income = daily_servicios.add(daily_productos, fill_value=0).sort_index()
+        
+        # Convert to DataFrame
+        income_df = daily_income.reset_index()
+        income_df.columns = ['Fecha', 'Valor']
+        
+        # Get last 60 days of data
+        today = datetime.now().date()
+        sixty_days_ago = today - pd.Timedelta(days=60)
+        income_df = income_df[income_df['Fecha'] >= sixty_days_ago]
+        
+        if income_df.empty:
+            return jsonify({'status': 'success', 'historical': [], 'prediction': []})
+            
+        # Prepare for prediction (Linear Regression)
+        # Using ordinal dates as X
+        import numpy as np
+        from datetime import date
+        
+        income_df['Ordinal'] = income_df['Fecha'].apply(lambda x: x.toordinal())
+        X = income_df['Ordinal'].values.reshape(-1, 1)
+        y = income_df['Valor'].values
+        
+        # Simple Linear Regression: y = mx + b
+        if len(income_df) > 1:
+            n = len(X)
+            sum_x = np.sum(X)
+            sum_y = np.sum(y)
+            sum_xx = np.sum(X**2)
+            sum_xy = np.sum(X * y.reshape(-1, 1))
+            
+            denominator = (n * sum_xx - sum_x**2)
+            if denominator == 0:
+                slope = 0
+                intercept = np.mean(y)
+            else:
+                slope = (n * sum_xy - sum_x * sum_y) / denominator
+                intercept = (sum_y - slope * sum_x) / n
+        else:
+            slope = 0
+            intercept = y[0] if len(y) > 0 else 0
+            
+        # Generate next 7 days
+        predictions = []
+        last_date = income_df['Fecha'].max()
+        for i in range(1, 8):
+            pred_date = last_date + pd.Timedelta(days=i)
+            pred_ordinal = pred_date.toordinal()
+            pred_value = max(0, slope * pred_ordinal + intercept)
+            predictions.append({
+                'fecha': pred_date.strftime('%Y-%m-%d'),
+                'valor': float(pred_value)
+            })
+            
+        historical = []
+        for _, row in income_df.iterrows():
+            historical.append({
+                'fecha': row['Fecha'].strftime('%Y-%m-%d'),
+                'valor': float(row['Valor'])
+            })
+            
+        return jsonify({
+            'status': 'success',
+            'historical': historical,
+            'prediction': predictions,
+            'trend': 'up' if slope > 0 else 'down' if slope < 0 else 'stable'
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/customer-flow', methods=['GET'])
+@login_required
+def get_customer_flow():
+    try:
+        sede_filter = request.args.get('sede', 'Principal')
+        
+        # Load data
+        df_servicios = pd.read_excel(DB_FILE, sheet_name='Servicios')
+        
+        # Filter by sede
+        df_servicios = df_servicios[df_servicios['Sede'] == sede_filter]
+        
+        # Convert Fecha to datetime and floor to date
+        df_servicios['Fecha_DT'] = pd.to_datetime(df_servicios['Fecha'])
+        df_servicios['Fecha'] = df_servicios['Fecha_DT'].dt.date
+        
+        # Aggregate by date (count of services = customers)
+        daily_customers = df_servicios.groupby('Fecha').size().sort_index()
+        
+        # Convert to DataFrame
+        flow_df = daily_customers.reset_index()
+        flow_df.columns = ['Fecha', 'Clientes']
+        
+        # Get last 60 days
+        today = datetime.now().date()
+        sixty_days_ago = today - pd.Timedelta(days=60)
+        flow_df = flow_df[flow_df['Fecha'] >= sixty_days_ago]
+        
+        if flow_df.empty:
+            return jsonify({'status': 'success', 'historical': [], 'prediction': [], 'patterns': {}})
+            
+        # Calculate patterns by day of week
+        flow_df['DayOfWeek'] = pd.to_datetime(flow_df['Fecha']).dt.dayofweek # 0=Mon, 6=Sun
+        patterns = flow_df.groupby('DayOfWeek')['Clientes'].mean().to_dict()
+        
+        # Predict trend (Linear Regression)
+        import numpy as np
+        flow_df['Ordinal'] = flow_df['Fecha'].apply(lambda x: x.toordinal())
+        X = flow_df['Ordinal'].values.reshape(-1, 1)
+        y = flow_df['Clientes'].values
+        
+        if len(flow_df) > 1:
+            n = len(X)
+            sum_x = np.sum(X)
+            sum_y = np.sum(y)
+            sum_xx = np.sum(X**2)
+            sum_xy = np.sum(X * y.reshape(-1, 1))
+            denominator = (n * sum_xx - sum_x**2)
+            if denominator == 0:
+                slope = 0
+                intercept = np.mean(y)
+            else:
+                slope = (n * sum_xy - sum_x * sum_y) / denominator
+                intercept = (sum_y - slope * sum_x) / n
+        else:
+            slope = 0
+            intercept = y[0] if len(y) > 0 else 0
+            
+        # Predict next 7 days combining Trend + Seasonality
+        predictions = []
+        last_date = flow_df['Fecha'].max()
+        for i in range(1, 8):
+            pred_date = last_date + pd.Timedelta(days=i)
+            dow = pred_date.dayofweek
+            
+            # Trend component
+            trend_val = slope * pred_date.toordinal() + intercept
+            # Seasonality component (using average for that day of week)
+            seasonal_avg = patterns.get(dow, np.mean(y))
+            
+            # Blend trend and seasonality
+            global_avg = np.mean(y)
+            if global_avg == 0:
+                pred_val = seasonal_avg
+            else:
+                trend_factor = trend_val / global_avg
+                pred_val = seasonal_avg * trend_factor
+                
+            predictions.append({
+                'fecha': pred_date.strftime('%Y-%m-%d'),
+                'valor': float(max(0, pred_val)),
+                'dow': int(dow)
+            })
+            
+        historical = []
+        for _, row in flow_df.iterrows():
+            historical.append({
+                'fecha': row['Fecha'].strftime('%Y-%m-%d'),
+                'valor': int(row['Clientes']),
+                'dow': int(row['DayOfWeek'])
+            })
+            
+        # Day names for patterns
+        day_names = {0: 'Lunes', 1: 'Martes', 2: 'Miércoles', 3: 'Jueves', 4: 'Viernes', 5: 'Sábado', 6: 'Domingo'}
+        named_patterns = {day_names[k]: float(v) for k, v in patterns.items()}
+            
+        return jsonify({
+            'status': 'success',
+            'historical': historical,
+            'prediction': predictions,
+            'patterns': named_patterns
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/service-demand', methods=['GET'])
+@login_required
+def get_service_demand():
+    try:
+        sede_filter = request.args.get('sede', 'Principal')
+        # Load services data
+        df_servicios = pd.read_excel(DB_FILE, sheet_name='Servicios')
+        # Filter by sede
+        df_servicios = df_servicios[df_servicios['Sede'] == sede_filter]
+        # Convert Fecha to datetime.date
+        df_servicios['Fecha'] = pd.to_datetime(df_servicios['Fecha']).dt.date
+        # Keep only last 60 days
+        today = datetime.now().date()
+        sixty_days_ago = today - pd.Timedelta(days=60)
+        df_recent = df_servicios[df_servicios['Fecha'] >= sixty_days_ago]
+        if df_recent.empty:
+            return jsonify({'status': 'success', 'historical': [], 'prediction': [], 'growthService': None})
+        # Expected service types
+        expected = ['Corte', 'Tintura', 'Uñas', 'Depilación']
+        # Count services per day per type
+        count_df = df_recent.groupby(['Fecha', 'Tipo']).size().reset_index(name='Count')
+        # Pivot to have each service type as a column
+        pivot_df = count_df.pivot(index='Fecha', columns='Tipo', values='Count').fillna(0).astype(int)
+        for svc in expected:
+            if svc not in pivot_df.columns:
+                pivot_df[svc] = 0
+        pivot_df = pivot_df[expected]
+        # Historical data list
+        historical = []
+        for fecha, row in pivot_df.iterrows():
+            entry = {'fecha': fecha.strftime('%Y-%m-%d')}
+            for svc in expected:
+                entry[svc] = int(row[svc])
+            historical.append(entry)
+        # Simple linear regression per service for next 7 days
+        predictions = []
+        growth = {}
+        last_date = pivot_df.index.max()
+        for svc in expected:
+            y = pivot_df[svc].values
+            X = np.arange(len(y)).reshape(-1, 1)
+            if len(y) > 1:
+                n = len(y)
+                sum_x = X.sum()
+                sum_y = y.sum()
+                sum_xx = (X**2).sum()
+                sum_xy = (X * y.reshape(-1, 1)).sum()
+                denom = n * sum_xx - sum_x**2
+                if denom == 0:
+                    slope = 0
+                    intercept = y.mean()
+                else:
+                    slope = (n * sum_xy - sum_x * sum_y) / denom
+                    intercept = (sum_y - slope * sum_x) / n
+            else:
+                slope = 0
+                intercept = y[0] if len(y) else 0
+            for i in range(1, 8):
+                pred_idx = len(y) - 1 + i
+                pred_val = max(0, slope * pred_idx + intercept)
+                pred_date = last_date + pd.Timedelta(days=i)
+                if len(predictions) < i:
+                    predictions.append({'fecha': pred_date.strftime('%Y-%m-%d')})
+                predictions[i-1][svc] = int(round(pred_val))
+            growth[svc] = predictions[-1][svc] - int(pivot_df[svc].iloc[-1])
+        growth_service = max(growth, key=growth.get) if growth else None
+        return jsonify({
+            'status': 'success',
+            'historical': historical,
+            'prediction': predictions,
+            'growthService': growth_service
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 if __name__ == '__main__':
     init_db()
     app.run(host='0.0.0.0', debug=True)
