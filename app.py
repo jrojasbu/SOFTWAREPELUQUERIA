@@ -355,6 +355,36 @@ def index():
 def view_certificate():
     return render_template('certificado.html')
 
+@app.route('/certificado/descargar')
+@login_required
+def download_certificate_pdf():
+    try:
+        context = {
+            'date': datetime.now().strftime('%d de %B de %Y'),
+            'generation_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
+        
+        # Translate month names if possible or use simple format
+        months = {
+            'January': 'Enero', 'February': 'Febrero', 'March': 'Marzo', 'April': 'Abril',
+            'May': 'Mayo', 'June': 'Junio', 'July': 'Julio', 'August': 'Agosto',
+            'September': 'Septiembre', 'October': 'Octubre', 'November': 'Noviembre', 'December': 'Diciembre'
+        }
+        now = datetime.now()
+        date_str = f"{now.day} de {months.get(now.strftime('%B'), now.strftime('%B'))} de {now.year}"
+        context['date'] = date_str
+
+        pdf = render_pdf('certificado_pdf.html', context)
+        if pdf:
+            response = make_response(pdf)
+            response.headers['Content-Type'] = 'application/pdf'
+            response.headers['Content-Disposition'] = 'attachment; filename=Certificado_Propiedad_MagicalHair.pdf'
+            return response
+        
+        return "Error al generar el PDF del certificado", 500
+    except Exception as e:
+        return str(e), 500
+
 @app.route('/api/stylist', methods=['POST'])
 @login_required
 def add_stylist():

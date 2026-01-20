@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Certificado de Propiedad Intelectual - Magical Hair</title>
+    <style>
+        @page {
+            size: a4 landscape;
+            margin: 0.5cm;
+        }
+
+        body {
+            font-family: Helvetica, sans-serif;
+            color: #1a1a1a;
+            margin: 0;
+            padding: 0;
+        }
+
+        .border-outer {
+            border: 15px solid #d4af37;
+            height: 18cm;
+            padding: 1cm;
+            position: relative;
+        }
+
+        .border-inner {
+            border: 2px solid #d4af37;
+            height: 17.5cm;
+            width: 100%;
+            position: absolute;
+            top: 0.25cm;
+            left: 0.25cm;
+        }
+
+        .content {
+            text-align: center;
+            padding-top: 1cm;
+        }
+
+        .header {
+            margin-bottom: 1.5cm;
+        }
+
+        .title {
+            font-size: 32pt;
+            color: #d4af37;
+            text-transform: uppercase;
+            letter-spacing: 5pt;
+            margin: 0;
+        }
+
+        .subtitle {
+            font-size: 14pt;
+            color: #555;
+            letter-spacing: 2pt;
+            margin-top: 10pt;
+            text-transform: uppercase;
+        }
+
+        .body-text {
+            font-size: 16pt;
+            margin-top: 2cm;
+            font-style: italic;
+            color: #333;
+        }
+
+        .author-name {
+            font-size: 36pt;
+            font-weight: bold;
+            color: #000;
+            margin-top: 0.5cm;
+            margin-bottom: 0.2cm;
+            text-decoration: underline;
+        }
+
+        .author-id {
+            font-size: 18pt;
+            color: #444;
+            margin-bottom: 1.5cm;
+        }
+
+        .software-box {
+            background-color: #fcf8e8;
+            border: 1px solid #e5d1a0;
+            padding: 20pt;
+            margin: 1cm 2cm;
+            text-align: center;
+        }
+
+        .software-name {
+            font-size: 18pt;
+            color: #d4af37;
+            font-weight: bold;
+        }
+
+        .software-desc {
+            font-size: 11pt;
+            color: #666;
+            margin-top: 10pt;
+            line-height: 1.4;
+        }
+
+        .footer {
+            margin-top: 2cm;
+            width: 100%;
+        }
+
+        .signature-table {
+            width: 100%;
+            margin-top: 1cm;
+        }
+
+        .signature-cell {
+            width: 33%;
+            text-align: center;
+            vertical-align: bottom;
+        }
+
+        .signature-line {
+            border-top: 1px solid #d4af37;
+            width: 80%;
+            margin: 0 auto 5pt auto;
+        }
+
+        .signature-label {
+            font-size: 9pt;
+            color: #d4af37;
+            text-transform: uppercase;
+        }
+
+        .seal {
+            width: 80pt;
+            height: 80pt;
+            border: 2pt solid #d4af37;
+            border-radius: 40pt;
+            margin: 0 auto;
+            text-align: center;
+            line-height: 80pt;
+            color: #d4af37;
+            font-weight: bold;
+            font-size: 24pt;
+        }
+
+        .date-text {
+            font-size: 10pt;
+            color: #666;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="border-outer">
+        <div class="content">
+            <div class="header">
+                <p class="title">Certificado de Propiedad Intelectual</p>
+                <p class="subtitle">Registro Oficial de Autoría de Software</p>
+            </div>
+
+            <p class="body-text">Se hace constar y se certifica que los derechos de autor corresponden a:</p>
+
+            <p class="author-name">Jairo Alonso Rojas Buitrago</p>
+            <p class="author-id">C.C. No. 80.141.170</p>
+
+            <div class="software-box">
+                <p class="software-name">MAGICAL HAIR - GESTIÓN PREMIUM</p>
+                <p class="software-desc">
+                    Sistema integral para peluquerías con control de servicios, ventas,
+                    inventarios y nómina automatizada. Desarrollado bajo estándares
+                    de excelencia técnica y analítica financiera.
+                </p>
+                <p style="font-size: 9pt; margin-top: 5pt; color: #888;">
+                    Versión 3.2.0 | Bogotá D.C., Colombia
+                </p>
+            </div>
+
+            <div class="footer">
+                <table class="signature-table">
+                    <tr>
+                        <td class="signature-cell">
+                            <div class="signature-line"></div>
+                            <div class="signature-label">Firma del Autor</div>
+                        </td>
+                        <td class="signature-cell">
+                            <div class="seal">MH</div>
+                        </td>
+                        <td class="signature-cell">
+                            <div class="date-text">
+                                Fecha de Registro:<br>
+                                <strong>{{ date }}</strong>
+                            </div>
+                            <div style="margin-top: 10pt;" class="signature-label">Registro Bogotá</div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
