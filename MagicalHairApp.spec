@@ -26,7 +26,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='MagicalHairApp_v3.2',
+    name='MagicalHairApp_v3.3',
     icon='Magical_Hair_v3.ico',
     debug=False,
     bootloader_ignore_signals=False,
