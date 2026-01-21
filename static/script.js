@@ -34,7 +34,7 @@ function openTab(tabName) {
 // Sede Management
 function getCurrentSede() {
     const selector = document.getElementById('sedeSelector');
-    return selector ? selector.value : 'Principal';
+    return selector ? selector.value : 'Bolivia';
 }
 
 function changeSede() {
@@ -67,8 +67,8 @@ let salesChart;
 let timelineChart;
 let servicesChart;
 let predictionChart;
-let customerFlowChart;
-let customerPatternsChart;
+let revenueHeatmapChart;
+let serviceDemandChart;
 
 async function loadSummary() {
     try {
@@ -748,134 +748,9 @@ async function loadStatistics() {
     }
 
     // Load prediction chart independently
-    loadPredictionChart();
-    loadCustomerFlowChart();
-}
-
-async function loadCustomerFlowChart() {
-    const sede = getCurrentSede();
-    try {
-        const response = await fetch(`/api/customer-flow?sede=${sede}`);
-        const result = await response.json();
-
-        if (result.status === 'success') {
-            console.log('Customer flow API result:', result);
-            if (!result.historical || result.historical.length === 0) {
-                console.warn('No customer flow data available');
-                return;
-            }
-            const flowCtx = document.getElementById('customerFlowChart').getContext('2d');
-            const patternCtx = document.getElementById('customerPatternsChart').getContext('2d');
-
-            if (customerFlowChart) customerFlowChart.destroy();
-            if (customerPatternsChart) customerPatternsChart.destroy();
-
-            // 1. Customer Flow & Prediction Chart
-            const histLabels = result.historical.map(d => d.fecha);
-            const histData = result.historical.map(d => d.valor);
-            const predLabels = result.prediction ? result.prediction.map(d => d.fecha) : [];
-            const predData = result.prediction ? result.prediction.map(d => d.valor) : [];
-
-            const allLabels = [...histLabels, ...predLabels];
-            const histDataset = [...histData];
-            for (let i = 0; i < predData.length; i++) histDataset.push(null);
-
-            const predictionDataset = new Array(Math.max(0, histData.length - 1)).fill(null);
-            if (histData.length > 0) {
-                predictionDataset.push(histData[histData.length - 1]);
-            }
-            predData.forEach(v => predictionDataset.push(v));
-
-            customerFlowChart = new Chart(flowCtx, {
-                type: 'line',
-                data: {
-                    labels: allLabels,
-                    datasets: [
-                        {
-                            label: 'Clientes Reales',
-                            data: histDataset,
-                            borderColor: '#ec4899',
-                            backgroundColor: 'rgba(236, 72, 153, 0.1)',
-                            fill: true,
-                            tension: 0.4,
-                            pointRadius: 2
-                        },
-                        {
-                            label: 'Proyección (Proxy)',
-                            data: predictionDataset,
-                            borderColor: '#cbd5e1',
-                            borderDash: [5, 5],
-                            tension: 0.4,
-                            pointRadius: 3
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: { beginAtZero: true, ticks: { color: '#94a3b8', stepSize: 1 }, grid: { color: 'rgba(255, 255, 255, 0.05)' } },
-                        x: { ticks: { color: '#94a3b8', autoSkip: true, maxTicksLimit: 10 }, grid: { display: false } }
-                    },
-                    plugins: {
-                        legend: { labels: { color: '#cbd5e1' } },
-                        datalabels: { display: false }
-                    }
-                }
-            });
-
-            // 2. Day of Week Patterns Chart
-            const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-            const patternData = days.map(day => result.patterns[day] || 0);
-
-            // Highlight strong and weak days
-            const maxVal = Math.max(...patternData);
-            const minVal = Math.min(...patternData);
-
-            const backgroundColors = patternData.map(val => {
-                if (val === maxVal) return '#ec4899'; // Strongest
-                if (val === minVal) return '#f87171'; // Weakest
-                return 'rgba(236, 72, 153, 0.4)';
-            });
-
-            customerPatternsChart = new Chart(patternCtx, {
-                type: 'bar',
-                data: {
-                    labels: days,
-                    datasets: [{
-                        label: 'Promedio Clientes/Día',
-                        data: patternData,
-                        backgroundColor: backgroundColors,
-                        borderRadius: 6
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: { beginAtZero: true, ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255, 255, 255, 0.05)' } },
-                        x: { ticks: { color: '#94a3b8' }, grid: { display: false } }
-                    },
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: (context) => `Promedio: ${context.parsed.y.toFixed(1)} clientes`
-                            }
-                        },
-                        datalabels: {
-                            color: '#fff',
-                            anchor: 'end',
-                            align: 'top',
-                            formatter: (val) => val.toFixed(1)
-                        }
-                    }
-                }
-            });
-        }
-    } catch (error) {
-        console.error('Error loading customer flow:', error);
-    }
+    await loadPredictionChart();
+    await loadRevenueHeatmap();
+    await loadServiceDemand();
 }
 
 async function loadPredictionChart() {
@@ -1042,6 +917,243 @@ async function loadPredictionChart() {
         }
     } catch (error) {
         console.error('Error loading prediction:', error);
+    }
+}
+
+
+async function loadRevenueHeatmap() {
+    const sede = getCurrentSede();
+    try {
+        const response = await fetch(`/api/revenue-patterns?sede=${sede}`);
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            // Update Inference Text
+            const inferenceDiv = document.getElementById('revenueInference');
+            if (inferenceDiv) {
+                inferenceDiv.textContent = result.inference;
+            }
+
+            // Prepare Chart Data
+            const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+            const dataValues = days.map(day => result.patterns[day] || 0);
+
+            // Calculate colors based on value (Heatmap effect)
+            const maxVal = Math.max(...dataValues, 1);
+            const colors = dataValues.map(val => {
+                // Opacity from 0.2 to 1.0 based on relative value
+                const alpha = 0.2 + (val / maxVal) * 0.8;
+                return `rgba(16, 185, 129, ${alpha})`; // Emerald green
+            });
+
+            const ctx = document.getElementById('revenueHeatmapChart').getContext('2d');
+            if (revenueHeatmapChart) revenueHeatmapChart.destroy();
+
+            revenueHeatmapChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: days,
+                    datasets: [{
+                        label: 'Ingreso Promedio Semanal',
+                        data: dataValues,
+                        backgroundColor: colors,
+                        borderColor: '#10b981',
+                        borderWidth: 1,
+                        borderRadius: 6,
+                        barPercentage: 0.9,
+                        categoryPercentage: 0.9
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                color: '#94a3b8',
+                                callback: (value) => '$' + value.toLocaleString()
+                            },
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                        },
+                        x: {
+                            ticks: { color: '#94a3b8' },
+                            grid: { display: false }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => `Promedio: $${context.parsed.y.toLocaleString()}`
+                            }
+                        },
+                        datalabels: {
+                            color: '#fff',
+                            anchor: 'end',
+                            align: 'top',
+                            formatter: (val) => {
+                                if (val === 0) return '';
+                                // Shorten large numbers
+                                if (val >= 1000000) return '$' + (val / 1000000).toFixed(1) + 'M';
+                                if (val >= 1000) return '$' + (val / 1000).toFixed(0) + 'k';
+                                return '$' + val;
+                            },
+                            font: { weight: 'bold', size: 10 }
+                        }
+                    }
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error loading revenue heatmap:', error);
+    }
+}
+
+
+
+
+async function loadServiceDemand() {
+    const sede = getCurrentSede();
+    try {
+        const response = await fetch(`/api/service-demand?sede=${sede}`);
+
+        // Handle no 200 OK
+        if (!response.ok) {
+            console.error('Service demand API error:', response.status);
+            const div = document.getElementById('growthInference');
+            if (div) {
+                div.style.display = 'block';
+                div.innerHTML = 'Error en la API de demanda de servicios. Código: ' + response.status;
+            }
+            return;
+        }
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            const ctx = document.getElementById('serviceDemandChart').getContext('2d');
+            if (serviceDemandChart) serviceDemandChart.destroy();
+
+            const historical = result.historical || [];
+            const prediction = result.prediction || [];
+
+            if (historical.length === 0) {
+                const div = document.getElementById('growthInference');
+                if (div) {
+                    div.style.display = 'block';
+                    div.innerHTML = 'No hay datos suficientes para mostrar la demanda de servicios. Verifica que haya servicios registrados en los últimos 60 días para la sede seleccionada.';
+                }
+                return;
+            }
+
+            // Prepare labels
+            const labels = [...historical.map(d => d.fecha), ...prediction.map(d => d.fecha)];
+
+            // Service Types
+            const types = ['Corte', 'Tintura', 'Uñas', 'Depilación'];
+            const colors = {
+                'Corte': '#3b82f6',     // Blue
+                'Tintura': '#ec4899',   // Pink
+                'Uñas': '#8b5cf6',      // Purple
+                'Depilación': '#f97316' // Orange
+            };
+
+            const datasets = types.map(type => {
+                // Historical Data
+                const histData = historical.map(d => d[type] || 0);
+                // Prediction Data
+                const predData = prediction.map(d => d[type] || 0);
+
+                // Complete Data array with nulls to spacing if needed, but here we just concat
+                // Actually for stacked bar, we should concat values.
+                const allData = [...histData, ...predData];
+
+                // Background Colors: Solid for historical, Transparent/Border for prediction
+                const bgColors = allData.map((_, i) => {
+                    return i < histData.length ? colors[type] : `${colors[type]}80`; // 50% opacity for prediction
+                });
+
+                const borderColors = allData.map((_, i) => {
+                    return i < histData.length ? colors[type] : '#fff'; // White border for prediction to distinguish
+                });
+
+                const borderWidths = allData.map((_, i) => {
+                    return i < histData.length ? 0 : 2; // Border for prediction
+                });
+
+                return {
+                    label: type,
+                    data: allData,
+                    backgroundColor: bgColors,
+                    borderColor: borderColors,
+                    borderWidth: borderWidths,
+                    stack: 'Stack 0'
+                };
+            });
+
+            serviceDemandChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            stacked: true,
+                            ticks: { color: '#94a3b8', maxTicksLimit: 15 },
+                            grid: { display: false }
+                        },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true,
+                            ticks: { color: '#94a3b8', stepSize: 1 },
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                        }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#cbd5e1' } },
+                        tooltip: {
+                            callbacks: {
+                                title: (context) => {
+                                    const index = context[0].dataIndex;
+                                    const label = context[0].label;
+                                    return index >= historical.length ? `${label} (Predicción)` : label;
+                                }
+                            }
+                        },
+                        datalabels: { display: false } // Too crowded
+                    }
+                }
+            });
+
+            // Update Inference Box
+            const growthDiv = document.getElementById('growthInference');
+            if (growthDiv) {
+                if (result.growthService) {
+                    growthDiv.style.display = 'block';
+                    growthDiv.innerHTML = `
+                        <p style="color: #cbd5e1; margin-bottom: 0.5rem; font-weight: bold;">💡 Análisis de Tendencia</p>
+                        <p style="color: #93c5fd;">
+                            Se proyecta que el servicio de <span style="font-weight: bold; color: #fff; font-size: 1.1em;">${result.growthService}</span> tendrá el mayor crecimiento en la demanda durante la próxima semana.
+                        </p>
+                    `;
+                } else {
+                    growthDiv.style.display = 'none';
+                }
+            }
+
+        }
+    } catch (error) {
+        console.error('Error loading service demand:', error);
+        const div = document.getElementById('growthInference');
+        if (div) {
+            div.style.display = 'block';
+            div.innerHTML = 'Error al cargar la demanda de servicios. Revisa la consola para más detalles.';
+        }
     }
 }
 

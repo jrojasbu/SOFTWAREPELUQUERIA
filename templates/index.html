@@ -491,23 +491,33 @@
                 </div>
 
                 <div class="chart-wrapper"
-                    style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 12px; margin-bottom: 2rem; border-left: 4px solid #ec4899;">
-                    <h3 style="text-align: center; margin-bottom: 0.5rem;">👥 Flujo de Clientes y Patrones Semanales
-                    </h3>
-                    <p style="text-align: center; color: #94a3b8; font-size: 0.85rem; margin-bottom: 1.5rem;">Análisis
-                        de recurrencia y proyección de demanda</p>
-                    <div
-                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem;">
-                        <div style="min-height: 350px;">
-                            <h4 style="text-align: center; color: #cbd5e1; margin-bottom: 1rem; font-size: 0.9rem;">
-                                Proyección de Visitas</h4>
-                            <canvas id="customerFlowChart"></canvas>
-                        </div>
-                        <div style="min-height: 350px;">
-                            <h4 style="text-align: center; color: #cbd5e1; margin-bottom: 1rem; font-size: 0.9rem;">Días
-                                Fuertes vs Débiles</h4>
-                            <canvas id="customerPatternsChart"></canvas>
-                        </div>
+                    style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 12px; margin-bottom: 2rem; border-left: 4px solid #10b981;">
+                    <h3 style="text-align: center; margin-bottom: 0.5rem;">💸 Mapa de Calor de Ingresos (Semanal)</h3>
+                    <p style="text-align: center; color: #94a3b8; font-size: 0.85rem; margin-bottom: 1.5rem;">
+                        Análisis de volumen de ventas por día de la semana
+                    </p>
+                    <div style="min-height: 350px;">
+                        <canvas id="revenueHeatmapChart"></canvas>
+                    </div>
+                    <div id="revenueInference"
+                        style="margin-top: 1rem; color: #cbd5e1; font-size: 0.95rem; background: rgba(16, 185, 129, 0.1); padding: 1rem; border-radius: 8px; text-align: center; border: 1px solid rgba(16, 185, 129, 0.2);">
+                        <!-- Populated by JS -->
+                        Cargando inferencia...
+                    </div>
+                </div>
+
+                <div class="chart-wrapper"
+                    style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 12px; margin-bottom: 2rem; border-left: 4px solid #3b82f6;">
+                    <h3 style="text-align: center; margin-bottom: 0.5rem;">📈 Demanda de Servicios (Predictivo)</h3>
+                    <p style="text-align: center; color: #94a3b8; font-size: 0.85rem; margin-bottom: 1.5rem;">
+                        Histórico 60 días + Predicción 7 días
+                    </p>
+                    <div style="min-height: 400px;">
+                        <canvas id="serviceDemandChart"></canvas>
+                    </div>
+                    <div id="growthInference"
+                        style="margin-top: 1rem; color: #cbd5e1; font-size: 0.95rem; background: rgba(59, 130, 246, 0.1); padding: 1rem; border-radius: 8px; text-align: center; border: 1px solid rgba(59, 130, 246, 0.2); display: none;">
+                        <!-- Populated by JS -->
                     </div>
                 </div>
 
