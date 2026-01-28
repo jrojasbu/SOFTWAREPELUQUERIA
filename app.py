@@ -12,7 +12,8 @@ from xhtml2pdf import pisa
 app = Flask(__name__)
 app.secret_key = 'magical_hair_secret_key_change_this_in_production'  # Required for session
 
-DB_FILE = r'c:\Users\JROJASBU\OneDrive\Documentos\PROYECTOS\SOFTWARE PELUQUERIA\database.xlsx'
+# Use relative path for database.xlsx
+DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.xlsx')
 STYLISTS_FILE = 'stylists.json'
 SERVICES_FILE = 'services.json'
 SEDES_FILE = 'sedes.json'
