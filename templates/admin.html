@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración - Magical Hair</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #38bdf8;
+            --secondary-color: #0ea5e9;
+            --bg-color: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.8);
+            --text-color: #e2e8f0;
+            --input-bg: #1e293b;
+            --border-color: rgba(255, 255, 255, 0.1);
+            --danger-color: #ef4444;
+            --success-color: #22c55e;
+            --warning-color: #f59e0b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            min-height: 100vh;
+            display: block;
+            overflow-x: hidden;
+        }
+
+        .background-blobs {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .blob {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.6;
+        }
+
+        .blob-1 {
+            width: 400px;
+            height: 400px;
+            background: var(--primary-color);
+            top: -100px;
+            left: -100px;
+            animation: float 10s infinite alternate;
+        }
+
+        .blob-2 {
+            width: 300px;
+            height: 300px;
+            background: var(--secondary-color);
+            bottom: -50px;
+            right: -50px;
+            animation: float 8s infinite alternate-reverse;
+        }
+
+        @keyframes float {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(50px, 50px); }
+        }
+
+        /* Header */
+        .admin-header {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .admin-header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .back-link {
+            color: var(--text-color);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .back-link:hover {
+            background: var(--card-bg);
+            border-color: var(--primary-color);
+        }
+
+        /* Navigation Tabs */
+        .nav-tabs {
+            display: flex;
+            gap: 0.5rem;
+            padding: 1rem 2rem;
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border-color);
+            overflow-x: auto;
+        }
+
+        .nav-tab {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            background: transparent;
+            color: var(--text-color);
+            font-size: 0.9rem;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .nav-tab:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .nav-tab.active {
+            background: var(--primary-color);
+            color: #0f172a;
+        }
+
+        /* Main Content */
+        .admin-content {
+            padding: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Filters */
+        .filters-section {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .filter-group label {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .filter-input, .filter-select {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--input-bg);
+            color: var(--text-color);
+            font-size: 0.9rem;
+        }
+
+        .filter-input:focus, .filter-select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .btn {
+            padding: 0.6rem 1.2rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: var(--secondary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2744c9;
+        }
+
+        .btn-danger {
+            background: var(--danger-color);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn-success {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #16a34a;
+        }
+
+        .btn-warning {
+            background: var(--warning-color);
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: #d97706;
+        }
+
+        .btn-sm {
+            padding: 0.4rem 0.8rem;
+            font-size: 0.8rem;
+        }
+
+        /* Table */
+        .table-container {
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .data-table th {
+            background: rgba(0, 0, 0, 0.2);
+            font-weight: 600;
+            color: var(--primary-color);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .data-table td {
+            font-size: 0.9rem;
+        }
+
+        .data-table tbody tr:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .data-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn-icon {
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: modalIn 0.3s ease;
+        }
+
+        @keyframes modalIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            font-size: 1.25rem;
+            color: var(--primary-color);
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-color);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .modal-close:hover {
+            color: var(--danger-color);
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+        }
+
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+        }
+
+        /* Form */
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--input-bg);
+            color: var(--text-color);
+            font-size: 0.95rem;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .form-group textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: var(--primary-color);
+        }
+
+        /* Toast Notifications */
+        .toast-container {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .toast {
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            animation: toastIn 0.3s ease;
+            min-width: 250px;
+        }
+
+        .toast.success {
+            border-color: var(--success-color);
+            background: rgba(34, 197, 94, 0.2);
+        }
+
+        .toast.error {
+            border-color: var(--danger-color);
+            background: rgba(239, 68, 68, 0.2);
+        }
+
+        @keyframes toastIn {
+            from {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* Delete Confirmation */
+        .delete-confirm-text {
+            text-align: center;
+            padding: 1rem 0;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .delete-confirm-text strong {
+            color: var(--danger-color);
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 1rem;
+        }
+
+        .pagination button {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border-color);
+            background: transparent;
+            color: var(--text-color);
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            background: var(--card-bg);
+            border-color: var(--primary-color);
+        }
+
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination .page-info {
+            padding: 0 1rem;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .admin-content {
+                padding: 1rem;
+            }
+
+            .filters-section {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .filter-group {
+                width: 100%;
+            }
+
+            .filter-group select,
+            .filter-group input {
+                flex: 1;
+            }
+
+            .table-container {
+                overflow-x: auto;
+            }
+
+            .data-table {
+                min-width: 600px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="background-blobs">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+    </div>
+
+    <header class="admin-header">
+        <h1>📊 Panel de Administración</h1>
+        <div class="header-actions">
+            <a href="/" class="back-link">← Volver</a>
+        </div>
+    </header>
+
+    <nav class="nav-tabs">
+        <button class="nav-tab active" data-table="servicios">Servicios</button>
+        <button class="nav-tab" data-table="productos">Productos</button>
+        <button class="nav-tab" data-table="gastos">Gastos</button>
+        <button class="nav-tab" data-table="inventario">Inventario</button>
+        <button class="nav-tab" data-table="citas">Citas</button>
+        <button class="nav-tab" data-table="gastos_mensuales">Gastos Mensuales</button>
+    </nav>
+
+    <main class="admin-content">
+        <div class="filters-section">
+            <div class="filter-group">
+                <label for="filter-sede">Sede:</label>
+                <select id="filter-sede" class="filter-select">
+                    <option value="">Todas</option>
+                    {% for sede in sedes %}
+                    <option value="{{ sede }}">{{ sede }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="filter-fecha">Fecha:</label>
+                <input type="date" id="filter-fecha" class="filter-input">
+            </div>
+            <div class="filter-group">
+                <label for="filter-limit">Registros:</label>
+                <select id="filter-limit" class="filter-select">
+                    <option value="50">50</option>
+                    <option value="100" selected>100</option>
+                    <option value="200">200</option>
+                    <option value="">Todos</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" id="btn-add-new">
+                ➕ Agregar Registro
+            </button>
+            <button class="btn" id="btn-refresh">
+                🔄 Actualizar
+            </button>
+        </div>
+
+        <div class="table-container">
+            <table class="data-table" id="data-table">
+                <thead>
+                    <tr id="table-header">
+                        <th>Cargando...</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    <tr>
+                        <td class="loading">Cargando datos...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="pagination" id="pagination"></div>
+    </main>
+
+    <!-- Add/Edit Modal -->
+    <div class="modal-overlay" id="edit-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="modal-title">Agregar Registro</h2>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="record-form">
+                    <input type="hidden" id="record-id">
+                    <div id="form-fields">
+                        <!-- Dynamic form fields will be inserted here -->
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeModal()">Cancelar</button>
+                <button class="btn btn-primary" id="btn-save">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal-overlay" id="delete-modal">
+        <div class="modal" style="max-width: 400px;">
+            <div class="modal-header">
+                <h2>Confirmar Eliminación</h2>
+                <button class="modal-close" onclick="closeDeleteModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="delete-confirm-text">
+                    ¿Está seguro de eliminar el registro <strong id="delete-record-id">#0</strong>?<br><br>
+                    Esta acción no se puede deshacer.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeDeleteModal()">Cancelar</button>
+                <button class="btn btn-danger" id="btn-confirm-delete">Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script>
+        // Table column configurations
+        const tableConfigs = {
+            servicios: {
+                columns: ['id', 'sede', 'fecha', 'estilista', 'servicio', 'valor', 'comision', 'metodo_pago'],
+                labels: {
+                    id: 'ID',
+                    sede: 'Sede',
+                    fecha: 'Fecha',
+                    estilista: 'Estilista',
+                    servicio: 'Servicio',
+                    valor: 'Valor',
+                    comision: 'Comisión',
+                    metodo_pago: 'Método de Pago'
+                },
+                types: {
+                    id: 'number',
+                    sede: 'select',
+                    fecha: 'date',
+                    estilista: 'select',
+                    servicio: 'text',
+                    valor: 'number',
+                    comision: 'number',
+                    metodo_pago: 'select'
+                },
+                options: {
+                    sede: {{ sedes | tojson }},
+                    estilista: {{ stylists | tojson }},
+                    metodo_pago: ['Efectivo', 'Transferencia', 'Tarjeta', 'Otro']
+                }
+            },
+            productos: {
+                columns: ['id', 'sede', 'fecha', 'estilista', 'producto', 'marca', 'descripcion', 'valor', 'comision', 'metodo_pago'],
+                labels: {
+                    id: 'ID',
+                    sede: 'Sede',
+                    fecha: 'Fecha',
+                    estilista: 'Estilista',
+                    producto: 'Producto',
+                    marca: 'Marca',
+                    descripcion: 'Descripción',
+                    valor: 'Valor',
+                    comision: 'Comisión',
+                    metodo_pago: 'Método de Pago'
+                },
+                types: {
+                    id: 'number',
+                    sede: 'select',
+                    fecha: 'date',
+                    estilista: 'select',
+                    producto: 'text',
+                    marca: 'text',
+                    descripcion: 'text',
+                    valor: 'number',
+                    comision: 'number',
+                    metodo_pago: 'select'
+                },
+                options: {
+                    sede: {{ sedes | tojson }},
+                    estilista: {{ stylists | tojson }},
+                    metodo_pago: ['Efectivo', 'Transferencia', 'Tarjeta', 'Otro']
+                }
+            },
+            gastos: {
+                columns: ['id', 'sede', 'fecha', 'descripcion', 'valor'],
+                labels: {
+                    id: 'ID',
+                    sede: 'Sede',
+                    fecha: 'Fecha',
+                    descripcion: 'Descripción',
+                    valor: 'Valor'
+                },
+                types: {
+                    id: 'number',
+                    sede: 'select',
+                    fecha: 'date',
+                    descripcion: 'text',
+                    valor: 'number'
+                },
+                options: {
+                    sede: {{ sedes | tojson }}
+                }
+            },
+            inventario: {
+                columns: ['id', 'sede', 'producto', 'marca', 'descripcion', 'cantidad', 'unidad', 'valor', 'estado', 'fecha_actualizacion'],
+                labels: {
+                    id: 'ID',
+                    sede: 'Sede',
+                    producto: 'Producto',
+                    marca: 'Marca',
+                    descripcion: 'Descripción',
+                    cantidad: 'Cantidad',
+                    unidad: 'Unidad',
+                    valor: 'Valor',
+                    estado: 'Estado',
+                    fecha_actualizacion: 'Última Actualización'
+                },
+                types: {
+                    id: 'number',
+                    sede: 'select',
+                    producto: 'text',
+                    marca: 'text',
+                    descripcion: 'text',
+                    cantidad: 'number',
+                    unidad: 'text',
+                    valor: 'number',
+                    estado: 'select',
+                    fecha_actualizacion: 'date'
+                },
+                options: {
+                    sede: {{ sedes | tojson }},
+                    estado: ['Nuevo', 'Usado', 'Bajo', 'Agotado', 'Descontinuado']
+                }
+            },
+            citas: {
+                columns: ['id', 'sede', 'fecha', 'hora', 'cliente', 'telefono', 'servicio', 'notas', 'estado'],
+                labels: {
+                    id: 'ID',
+                    sede: 'Sede',
+                    fecha: 'Fecha',
+                    hora: 'Hora',
+                    cliente: 'Cliente',
+                    telefono: 'Teléfono',
+                    servicio: 'Servicio',
+                    notas: 'Notas',
+                    estado: 'Estado'
+                },
+                types: {
+                    id: 'text',
+                    sede: 'select',
+                    fecha: 'date',
+                    hora: 'time',
+                    cliente: 'text',
+                    telefono: 'text',
+                    servicio: 'select',
+                    notas: 'text',
+                    estado: 'select'
+                },
+                options: {
+                    sede: {{ sedes | tojson }},
+                    servicio: {{ services | tojson }}.map(s => s.name || s),
+                    estado: ['Programada', 'Confirmada', 'Atendida', 'Cancelada', 'No Asistió']
+                }
+            },
+            gastos_mensuales: {
+                columns: ['id', 'sede', 'mes', 'tipo', 'valor', 'fecha_registro'],
+                labels: {
+                    id: 'ID',
+                    sede: 'Sede',
+                    mes: 'Mes',
+                    tipo: 'Tipo',
+                    valor: 'Valor',
+                    fecha_registro: 'Fecha de Registro'
+                },
+                types: {
+                    id: 'number',
+                    sede: 'select',
+                    mes: 'text',
+                    tipo: 'text',
+                    valor: 'number',
+                    fecha_registro: 'date'
+                },
+                options: {
+                    sede: {{ sedes | tojson }},
+                    tipo: ['Arriendo', 'Servicios', 'Nómina', 'Inventario', 'Mantenimiento', 'Marketing', 'Otro']
+                }
+            }
+        };
+
+        // State
+        let currentTable = 'servicios';
+        let records = [];
+        let currentOffset = 0;
+        const limit = 100;
+
+        // DOM Elements
+        const tableHeader = document.getElementById('table-header');
+        const tableBody = document.getElementById('table-body');
+        const editModal = document.getElementById('edit-modal');
+        const deleteModal = document.getElementById('delete-modal');
+        const formFields = document.getElementById('form-fields');
+        const filterSede = document.getElementById('filter-sede');
+        const filterFecha = document.getElementById('filter-fecha');
+        const filterLimit = document.getElementById('filter-limit');
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadData();
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            // Navigation tabs
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    currentTable = tab.dataset.table;
+                    currentOffset = 0;
+                    loadData();
+                });
+            });
+
+            // Filters
+            filterSede.addEventListener('change', () => { currentOffset = 0; loadData(); });
+            filterFecha.addEventListener('change', () => { currentOffset = 0; loadData(); });
+            filterLimit.addEventListener('change', () => { currentOffset = 0; loadData(); });
+
+            // Buttons
+            document.getElementById('btn-add-new').addEventListener('click', () => openAddModal());
+            document.getElementById('btn-refresh').addEventListener('click', loadData);
+            document.getElementById('btn-save').addEventListener('click', saveRecord);
+            document.getElementById('btn-confirm-delete').addEventListener('click', deleteRecord);
+
+            // Modal close on overlay click
+            editModal.addEventListener('click', (e) => {
+                if (e.target === editModal) closeModal();
+            });
+            deleteModal.addEventListener('click', (e) => {
+                if (e.target === deleteModal) closeDeleteModal();
+            });
+        }
+
+        async function loadData() {
+            const sede = filterSede.value;
+            const fecha = filterFecha.value;
+            const limitVal = filterLimit.value;
+
+            let url = `/api/admin/${currentTable}?`;
+            if (sede) url += `sede=${encodeURIComponent(sede)}&`;
+            if (fecha) url += `fecha=${encodeURIComponent(fecha)}&`;
+            if (limitVal) url += `limit=${limitVal}&`;
+            url += `offset=${currentOffset}`;
+
+            try {
+                const response = await fetch(url);
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    records = result.data;
+                    renderTable(result.columns);
+                } else {
+                    showToast(result.message || 'Error al cargar datos', 'error');
+                }
+            } catch (error) {
+                showToast('Error de conexión', 'error');
+                console.error(error);
+            }
+        }
+
+        function renderTable(columns) {
+            const config = tableConfigs[currentTable];
+            
+            // Render header
+            let headerHtml = '';
+            columns.forEach(col => {
+                const label = config.labels[col] || col;
+                headerHtml += `<th>${label}</th>`;
+            });
+            headerHtml += '<th>Acciones</th>';
+            tableHeader.innerHTML = headerHtml;
+
+            // Render body
+            if (records.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="${columns.length + 1}" class="empty-state">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                            </svg>
+                            <p>No hay registros</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            let bodyHtml = '';
+            records.forEach(record => {
+                bodyHtml += '<tr>';
+                columns.forEach(col => {
+                    let value = record[col];
+                    if (value === null || value === undefined) value = '';
+                    if (typeof value === 'number' && (col === 'valor' || col === 'comision' || col === 'cantidad')) {
+                        value = value.toLocaleString('es-CO', { style: 'currency', currency: 'COP' });
+                    }
+                    bodyHtml += `<td>${value}</td>`;
+                });
+                bodyHtml += `
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn btn-sm btn-warning" onclick="openEditModal(${record.id})">✏️</button>
+                            <button class="btn btn-sm btn-danger" onclick="openDeleteModal(${record.id})">🗑️</button>
+                        </div>
+                    </td>
+                `;
+                bodyHtml += '</tr>';
+            });
+            tableBody.innerHTML = bodyHtml;
+        }
+
+        function openAddModal() {
+            document.getElementById('modal-title').textContent = 'Agregar Registro';
+            document.getElementById('record-id').value = '';
+            renderFormFields();
+            editModal.classList.add('active');
+        }
+
+        async function openEditModal(id) {
+            try {
+                const response = await fetch(`/api/admin/${currentTable}/${id}`);
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    document.getElementById('modal-title').textContent = 'Editar Registro';
+                    document.getElementById('record-id').value = id;
+                    renderFormFields(result.data);
+                    editModal.classList.add('active');
+                } else {
+                    showToast(result.message || 'Error al cargar registro', 'error');
+                }
+            } catch (error) {
+                showToast('Error de conexión', 'error');
+            }
+        }
+
+        function renderFormFields(data = {}) {
+            const config = tableConfigs[currentTable];
+            let html = '';
+
+            config.columns.forEach(col => {
+                if (col === 'id' && !data[col]) return; // Skip auto-increment ID for new records
+
+                const label = config.labels[col];
+                const type = config.types[col];
+                const value = data[col] || '';
+                const options = config.options[col];
+
+                html += `<div class="form-group">`;
+                html += `<label for="field-${col}">${label}</label>`;
+
+                if (type === 'select' && options) {
+                    html += `<select id="field-${col}" name="${col}" ${col === 'id' ? 'disabled' : ''}>`;
+                    options.forEach(opt => {
+                        const optValue = typeof opt === 'object' ? opt.name || opt : opt;
+                        const optText = typeof opt === 'object' ? (opt.value !== undefined ? `${opt.name} (${opt.value})` : opt.name) : opt;
+                        html += `<option value="${optValue}" ${value == optValue ? 'selected' : ''}>${optText}</option>`;
+                    });
+                    html += `</select>`;
+                } else if (type === 'textarea') {
+                    html += `<textarea id="field-${col}" name="${col}" ${col === 'id' ? 'disabled' : ''}>${value}</textarea>`;
+                } else {
+                    html += `<input type="${type}" id="field-${col}" name="${col}" value="${value}" ${col === 'id' ? 'disabled' : ''}>`;
+                }
+
+                html += `</div>`;
+            });
+
+            formFields.innerHTML = html;
+        }
+
+        async function saveRecord() {
+            const id = document.getElementById('record-id').value;
+            const config = tableConfigs[currentTable];
+            const data = {};
+
+            config.columns.forEach(col => {
+                if (col === 'id') return;
+                const element = document.getElementById(`field-${col}`);
+                if (element) {
+                    let value = element.value;
+                    // Convert to number if needed
+                    if (config.types[col] === 'number' && value) {
+                        value = parseFloat(value);
+                    }
+                    data[col] = value;
+                }
+            });
+
+            const url = id ? `/api/admin/${currentTable}/${id}` : `/api/admin/${currentTable}`;
+            const method = id ? 'PUT' : 'POST';
+
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    showToast(id ? 'Registro actualizado' : 'Registro creado', 'success');
+                    closeModal();
+                    loadData();
+                } else {
+                    showToast(result.message || 'Error al guardar', 'error');
+                }
+            } catch (error) {
+                showToast('Error de conexión', 'error');
+            }
+        }
+
+        function openDeleteModal(id) {
+            document.getElementById('delete-record-id').textContent = `#${id}`;
+            document.getElementById('delete-record-id').dataset.id = id;
+            deleteModal.classList.add('active');
+        }
+
+        function closeDeleteModal() {
+            deleteModal.classList.remove('active');
+        }
+
+        async function deleteRecord() {
+            const id = document.getElementById('delete-record-id').dataset.id;
+
+            try {
+                const response = await fetch(`/api/admin/${currentTable}/${id}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    showToast('Registro eliminado', 'success');
+                    closeDeleteModal();
+                    loadData();
+                } else {
+                    showToast(result.message || 'Error al eliminar', 'error');
+                }
+            } catch (error) {
+                showToast('Error de conexión', 'error');
+            }
+        }
+
+        function closeModal() {
+            editModal.classList.remove('active');
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
