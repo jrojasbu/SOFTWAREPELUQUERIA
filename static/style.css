@@ -1,11 +1,11 @@
 :root {
-    --primary-color: #63ecf1;
-    --secondary-color: #325ff3;
-    --bg-color: #041230;
+    --primary-color: #00e1e9;
+    --secondary-color: #02d9ff;
+    --bg-color: #ffffff;
     --card-bg: rgba(255, 255, 255, 0.1);
-    --text-color: #fdfcfc;
-    --input-bg: rgba(193, 152, 221, 0.575);
-    --border-color: rgba(255, 255, 255, 0.1);
+    --text-color: #111111;
+    --input-bg: rgba(189, 124, 233, 0.575);
+    --border-color: rgba(15, 14, 14, 0.062);
 }
 
 * {
@@ -46,8 +46,8 @@ body {
 }
 
 .blob-1 {
-    width: 400px;
-    height: 400px;
+    width: 500px;
+    height: 500px;
     background: var(--primary-color);
     top: -100px;
     left: -100px;
@@ -55,8 +55,8 @@ body {
 }
 
 .blob-2 {
-    width: 300px;
-    height: 300px;
+    width: 200px;
+    height: 200px;
     background: var(--secondary-color);
     bottom: -50px;
     right: -50px;
@@ -66,7 +66,7 @@ body {
 .blob-3 {
     width: 200px;
     height: 200px;
-    background: #ec4899;
+    background: #f8017d69;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
@@ -101,14 +101,14 @@ body {
 .container {
     width: calc(100% - 40px);
     /* Use remaining space minus small right margin */
-    max-width: 1400px;
+    max-width: 1700px;
     margin: 40px 40px 40px 0;
     /* Align to the left (sidebar space provided by body padding) */
     background: var(--card-bg);
     backdrop-filter: blur(20px);
     border-radius: 24px;
     padding: 40px;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.685);
     border: 1px solid var(--border-color);
 }
 
@@ -125,7 +125,7 @@ header {
     height: auto;
     margin-bottom: 15px;
     border-radius: 50%;
-    box-shadow: 0 4px 6px -1px rgba(99, 236, 241, 0.4);
+    box-shadow: 0 4px 6px -1px rgba(28, 147, 194, 0.4);
 }
 
 header h1 {
@@ -139,7 +139,7 @@ header h1 {
 }
 
 header p {
-    color: #94a3b8;
+    color: #36598a;
     font-size: 0.95rem;
 }
 
@@ -152,12 +152,12 @@ header p {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    background: rgba(15, 23, 42, 0.9);
+    background: rgba(6, 24, 66, 0.753);
     backdrop-filter: blur(20px);
     padding: 20px 15px;
     border-radius: 24px;
     border: 1px solid var(--border-color);
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.829);
     z-index: 1000;
     width: 200px;
     overflow-y: auto;
@@ -169,7 +169,7 @@ header p {
     border-radius: 50%;
     margin: 0 auto 15px auto;
     display: block;
-    box-shadow: 0 0 15px rgba(99, 236, 241, 0.3);
+    box-shadow: 0 0 15px rgba(99, 236, 241, 0.911);
     border: 2px solid var(--primary-color);
 }
 
@@ -221,19 +221,19 @@ header p {
 }
 
 .sidebar-btn.admin {
-    background: rgba(14, 165, 233, 0.1);
+    background: rgba(3, 67, 97, 0.685);
     color: #0ea5e9;
     border: 1px solid rgba(14, 165, 233, 0.2);
 }
 
 .sidebar-btn.admin:hover {
-    background: #0ea5e9;
+    background: #0076d6;
     color: white;
 }
 
 .sidebar-btn.logout {
-    background: rgba(220, 53, 69, 0.1);
-    color: #dc3545;
+    background: rgba(59, 2, 8, 0.404);
+    color: #ff0922;
     border: 1px solid rgba(220, 53, 69, 0.2);
 }
 
@@ -297,7 +297,7 @@ header p {
 h2 {
     font-size: 1.25rem;
     margin-bottom: 20px;
-    color: white;
+    color: rgb(7, 3, 59);
 }
 
 .input-group {
@@ -360,7 +360,7 @@ h2 {
     font-size: 0.75rem;
     font-weight: 600;
     margin-left: 8px;
-    background: rgba(99, 236, 241, 0.2);
+    background: rgba(99, 236, 241, 0.568);
     color: var(--primary-color);
 }
 
@@ -370,7 +370,7 @@ h2 {
     border-radius: 6px;
     font-size: 0.8rem;
     font-weight: 600;
-    background: rgba(50, 95, 243, 0.2);
+    background: rgba(32, 81, 240, 0.788);
     color: var(--secondary-color);
 }
 
@@ -385,23 +385,29 @@ h2 {
 .subtotal-card {
     flex: 1;
     min-width: 150px;
-    background: rgba(99, 236, 241, 0.1);
+    background: rgba(1, 38, 39, 0.466);
     border: 1px solid rgba(99, 236, 241, 0.3);
     border-radius: 12px;
     padding: 1rem;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    transition: transform 0.2s ease;
+    transition: transform 0.2s ease, box-shadow 0.3s ease;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+                0 10px 15px -3px rgba(0, 0, 0, 0.1),
+                0 0 15px rgba(99, 236, 241, 0.1);
 }
 
 .subtotal-card:hover {
     transform: translateY(-2px);
+    box-shadow: 0 8px 15px -3px rgba(0, 0, 0, 0.15),
+                0 12px 20px -5px rgba(99, 236, 241, 0.2),
+                0 0 25px rgba(99, 236, 241, 0.2);
 }
 
 .payment-method {
     font-size: 0.85rem;
-    color: #94a3b8;
+    color: #1e3a5f;
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -410,7 +416,21 @@ h2 {
 .payment-total {
     font-size: 1.5rem;
     font-weight: 700;
-    color: var(--primary-color);
+    color: #0f172a;
+}
+
+/* Sufficiency Card */
+.sufficiency-card {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+                0 10px 15px -3px rgba(0, 0, 0, 0.1),
+                0 0 15px rgba(99, 236, 241, 0.1);
+    transition: box-shadow 0.3s ease;
+}
+
+.sufficiency-card:hover {
+    box-shadow: 0 8px 15px -3px rgba(0, 0, 0, 0.15),
+                0 12px 20px -5px rgba(99, 236, 241, 0.2),
+                0 0 25px rgba(99, 236, 241, 0.2);
 }
 
 /* Table Styles */
@@ -425,7 +445,7 @@ h2 {
 .summary-table {
     width: 100%;
     border-collapse: collapse;
-    color: var(--text-color);
+    color: #0f172a;
 }
 
 .summary-table th,
@@ -437,7 +457,7 @@ h2 {
 
 .summary-table th {
     font-weight: 600;
-    color: var(--primary-color);
+    color: #1e3a5f;
     text-transform: uppercase;
     font-size: 0.85rem;
     letter-spacing: 0.05em;
@@ -448,17 +468,17 @@ h2 {
 }
 
 .summary-table tbody tr:hover {
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(99, 236, 241, 0.1);
 }
 
 .summary-table tfoot tr {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(99, 236, 241, 0.15);
     font-weight: bold;
 }
 
 .summary-table tfoot td {
     border-top: 2px solid var(--primary-color);
-    color: var(--primary-color);
+    color: #0f172a;
     font-size: 1.1rem;
     padding: 16px;
 }
@@ -467,7 +487,7 @@ h2 {
     background: rgba(99, 236, 241, 0.1);
     font-weight: 900;
     font-size: 1.2rem;
-    color: #63ecf1;
+    color: #0f172a;
 }
 
 /* Select Styles for Filters */
@@ -587,16 +607,22 @@ h2 {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    transition: transform 0.2s ease;
+    transition: transform 0.2s ease, box-shadow 0.3s ease;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+                0 10px 15px -3px rgba(0, 0, 0, 0.1),
+                0 0 15px rgba(99, 236, 241, 0.1);
 }
 
 .subtotal-card:hover {
     transform: translateY(-2px);
+    box-shadow: 0 8px 15px -3px rgba(0, 0, 0, 0.15),
+                0 12px 20px -5px rgba(99, 236, 241, 0.2),
+                0 0 25px rgba(99, 236, 241, 0.2);
 }
 
 .payment-method {
     font-size: 0.85rem;
-    color: #94a3b8;
+    color: #1e3a5f;
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -605,7 +631,21 @@ h2 {
 .payment-total {
     font-size: 1.5rem;
     font-weight: 700;
-    color: var(--primary-color);
+    color: #0f172a;
+}
+
+/* Sufficiency Card */
+.sufficiency-card {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+                0 10px 15px -3px rgba(0, 0, 0, 0.1),
+                0 0 15px rgba(99, 236, 241, 0.1);
+    transition: box-shadow 0.3s ease;
+}
+
+.sufficiency-card:hover {
+    box-shadow: 0 8px 15px -3px rgba(0, 0, 0, 0.15),
+                0 12px 20px -5px rgba(99, 236, 241, 0.2),
+                0 0 25px rgba(99, 236, 241, 0.2);
 }
 
 /* Table Styles */
@@ -620,7 +660,7 @@ h2 {
 .summary-table {
     width: 100%;
     border-collapse: collapse;
-    color: var(--text-color);
+    color: #0f172a;
 }
 
 .summary-table th,
@@ -632,7 +672,7 @@ h2 {
 
 .summary-table th {
     font-weight: 600;
-    color: var(--primary-color);
+    color: #1e3a5f;
     text-transform: uppercase;
     font-size: 0.85rem;
     letter-spacing: 0.05em;
@@ -643,17 +683,17 @@ h2 {
 }
 
 .summary-table tbody tr:hover {
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(99, 236, 241, 0.1);
 }
 
 .summary-table tfoot tr {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(99, 236, 241, 0.15);
     font-weight: bold;
 }
 
 .summary-table tfoot td {
     border-top: 2px solid var(--primary-color);
-    color: var(--primary-color);
+    color: #0f172a;
     font-size: 1.1rem;
     padding: 16px;
 }
@@ -662,7 +702,7 @@ h2 {
     background: rgba(99, 236, 241, 0.1);
     font-weight: 900;
     font-size: 1.2rem;
-    color: #63ecf1;
+    color: #0f172a;
 }
 
 /* Select Styles for Filters */
@@ -755,16 +795,21 @@ h2 {
     padding: 1.5rem;
     text-align: center;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+                0 10px 15px -3px rgba(0, 0, 0, 0.1),
+                0 0 20px rgba(99, 236, 241, 0.15);
 }
 
 .stat-card:hover {
     transform: translateY(-4px);
-    box-shadow: 0 10px 20px rgba(99, 236, 241, 0.2);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2),
+                0 15px 30px -10px rgba(99, 236, 241, 0.3),
+                0 0 30px rgba(99, 236, 241, 0.25);
 }
 
 .stat-card h3 {
     font-size: 0.9rem;
-    color: #94a3b8;
+    color: #1e3a5f;
     margin-bottom: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -774,10 +819,7 @@ h2 {
 .stat-value {
     font-size: 2rem;
     font-weight: 700;
-    background: linear-gradient(to right, var(--primary-color), var(--secondary-color));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: #0f172a;
     margin: 0;
 }
 
