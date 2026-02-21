@@ -18,38 +18,39 @@
         <div class="blob blob-3"></div>
     </div>
 
-    <div class="container">
-        <header>
-            <img src="{{ url_for('static', filename='Magical_Hair.png') }}" alt="Magical Hair Logo" class="logo">
-            <h1>Gestión Peluquería Magical Hair</h1>
-            <p>Panel de Control Diario</p>
-            <a href="/logout" class="logout-btn"
-                style="position: absolute; top: 20px; right: 20px; background: #dc3545; color: white; padding: 0.5rem 1rem; text-decoration: none; border-radius: 8px; font-weight: 500;">Cerrar
-                Sesión</a>
-        </header>
+    <nav class="tabs">
+        <img src="{{ url_for('static', filename='Magical_Hair.png') }}" alt="Logo" class="sidebar-logo">
 
-        <div class="sede-selector-container">
-            <label for="sedeSelector">Sede:</label>
-            <div class="select-wrapper">
-                <select id="sedeSelector" class="sede-selector" onchange="changeSede()">
-                    {% for sede in sedes %}
-                    <option value="{{ sede }}">{{ sede }}</option>
-                    {% endfor %}
-                </select>
-            </div>
+        <div class="sidebar-sede-selector">
+            <label for="sedeSelector">Sede Actual</label>
+            <select id="sedeSelector" class="sede-selector" onchange="changeSede()">
+                {% for sede in sedes %}
+                <option value="{{ sede }}">{{ sede }}</option>
+                {% endfor %}
+            </select>
         </div>
 
-        <nav class="tabs">
-            <button class="tab-btn active" onclick="openTab('services')">Servicios</button>
-            <button class="tab-btn" onclick="openTab('products')">Productos</button>
-            <button class="tab-btn" onclick="openTab('expenses')">Gastos</button>
-            <button class="tab-btn" onclick="openTab('agenda')">Agenda</button>
-            <button class="tab-btn" onclick="openTab('inventory')">Inventario</button>
-            <button class="tab-btn" onclick="openTab('summary')">Resumen</button>
-            <button class="tab-btn" onclick="openTab('statistics')">Estadísticas</button>
-            <button class="tab-btn" onclick="openTab('monthly-expenses')">Gastos Fijos</button>
-            <button class="tab-btn" onclick="openTab('config')">Configuración</button>
-        </nav>
+        <button class="tab-btn active" onclick="openTab('services')">Servicios</button>
+        <button class="tab-btn" onclick="openTab('products')">Productos</button>
+        <button class="tab-btn" onclick="openTab('expenses')">Gastos</button>
+        <button class="tab-btn" onclick="openTab('agenda')">Agenda</button>
+        <button class="tab-btn" onclick="openTab('inventory')">Inventario</button>
+        <button class="tab-btn" onclick="openTab('summary')">Resumen</button>
+        <button class="tab-btn" onclick="openTab('statistics')">Estadísticas</button>
+        <button class="tab-btn" onclick="openTab('monthly-expenses')">Gastos Fijos</button>
+        <button class="tab-btn" onclick="openTab('config')">Configuración</button>
+
+        <div class="sidebar-footer">
+            <a href="/admin" class="sidebar-btn admin">⚙️ Administración</a>
+            <a href="/logout" class="sidebar-btn logout">🚪 Cerrar Sesión</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <header>
+            <h1>Gestión Peluquería Magical Hair</h1>
+            <p>Panel de Control Diario</p>
+        </header>
 
         <main>
             <!-- Servicios Section -->

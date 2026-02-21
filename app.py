@@ -4,7 +4,7 @@ import functools
 import pandas as pd
 import os
 from datetime import datetime
-import openpyxl
+import sqlite3
 import json
 from io import BytesIO
 from xhtml2pdf import pisa
@@ -12,8 +12,8 @@ from xhtml2pdf import pisa
 app = Flask(__name__)
 app.secret_key = 'magical_hair_secret_key_change_this_in_production'  # Required for session
 
-# Use relative path for database.xlsx
-DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.xlsx')
+# Use relative path for database.db
+DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.db')
 STYLISTS_FILE = 'stylists.json'
 SERVICES_FILE = 'services.json'
 SEDES_FILE = 'sedes.json'
@@ -129,150 +129,91 @@ def delete_user():
 
 
 
-def check_and_migrate_db():
-    """Check if the database has all required columns and add them if missing."""
-    if os.path.exists(DB_FILE):
-        try:
-            # Check Services sheet
-            df_services = pd.read_excel(DB_FILE, sheet_name='Servicios')
-            needs_update = False
-            
-            if 'Metodo_Pago' not in df_services.columns:
-                print("Migrating Services sheet: Adding Metodo_Pago column...")
-                df_services['Metodo_Pago'] = 'Efectivo'
-                needs_update = True
-                
-            if 'Sede' not in df_services.columns:
-                print("Migrating Services sheet: Adding Sede column...")
-                df_services.insert(0, 'Sede', 'Principal')
-                needs_update = True
-                
-            if needs_update:
-                with pd.ExcelWriter(DB_FILE, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
-                    df_services.to_excel(writer, sheet_name='Servicios', index=False)
-                    
-            # Check Products sheet
-            df_products = pd.read_excel(DB_FILE, sheet_name='Productos')
-            cols_to_add = []
-            if 'Metodo_Pago' not in df_products.columns: cols_to_add.append('Metodo_Pago')
-            if 'Marca' not in df_products.columns: cols_to_add.append('Marca')
-            if 'Descripcion' not in df_products.columns: cols_to_add.append('Descripcion')
-            
-            needs_update = False
-            if cols_to_add:
-                print(f"Migrating Products sheet: Adding {cols_to_add}...")
-                for col in cols_to_add:
-                    df_products[col] = '' if col != 'Metodo_Pago' else 'Efectivo'
-                needs_update = True
-                
-            if 'Sede' not in df_products.columns:
-                print("Migrating Products sheet: Adding Sede column...")
-                df_products.insert(0, 'Sede', 'Principal')
-                needs_update = True
-                
-            if needs_update:
-                with pd.ExcelWriter(DB_FILE, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
-                    df_products.to_excel(writer, sheet_name='Productos', index=False)
-            
-            # Check Gastos sheet
-            try:
-                df_gastos = pd.read_excel(DB_FILE, sheet_name='Gastos')
-                if 'Sede' not in df_gastos.columns:
-                    print("Migrating Gastos sheet: Adding Sede column...")
-                    df_gastos.insert(0, 'Sede', 'Principal')
-                    with pd.ExcelWriter(DB_FILE, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
-                        df_gastos.to_excel(writer, sheet_name='Gastos', index=False)
-            except:
-                pass
-            
-            # Check Inventory sheet
-            try:
-                df_inventario = pd.read_excel(DB_FILE, sheet_name='Inventario')
-                needs_update = False
-                
-                if 'Marca' not in df_inventario.columns:
-                    df_inventario['Marca'] = ''
-                    needs_update = True
-                if 'Estado' not in df_inventario.columns:
-                    df_inventario['Estado'] = 'Nuevo'
-                    needs_update = True
-                if 'Sede' not in df_inventario.columns:
-                    print("Migrating Inventario sheet: Adding Sede column...")
-                    df_inventario.insert(0, 'Sede', 'Principal')
-                    needs_update = True
-                    
-                if needs_update:
-                    with pd.ExcelWriter(DB_FILE, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
-                        df_inventario.to_excel(writer, sheet_name='Inventario', index=False)
-            except ValueError:
-                print("Migrating: Adding Inventario sheet...")
-                with pd.ExcelWriter(DB_FILE, engine='openpyxl', mode='a') as writer:
-                    pd.DataFrame(columns=['Sede', 'Producto', 'Marca', 'Descripcion', 'Cantidad', 'Unidad', 'Valor', 'Estado', 'Fecha_Actualizacion']).to_excel(writer, sheet_name='Inventario', index=False)
-
-            # Check Citas sheet
-            wb = openpyxl.load_workbook(DB_FILE)
-            if 'Citas' not in wb.sheetnames:
-                ws = wb.create_sheet('Citas')
-                ws.append(['ID', 'Sede', 'Fecha', 'Hora', 'Cliente', 'Telefono', 'Servicio', 'Notas', 'Estado'])
-                wb.save(DB_FILE)
-                print("Migrated database: Added Citas sheet")
-            else:
-                ws = wb['Citas']
-                headers = [cell.value for cell in ws[1]]
-                
-                needs_save = False
-                if 'ID' not in headers:
-                    ws.insert_cols(1)
-                    ws.cell(row=1, column=1, value='ID')
-                    import uuid
-                    for row in range(2, ws.max_row + 1):
-                        ws.cell(row=row, column=1, value=str(uuid.uuid4()))
-                    headers = [cell.value for cell in ws[1]]  # Refresh headers
-                    needs_save = True
-                    
-                if 'Sede' not in headers:
-                    print("Migrating Citas sheet: Adding Sede column...")
-                    # Insert Sede after ID (column 2)
-                    ws.insert_cols(2)
-                    ws.cell(row=1, column=2, value='Sede')
-                    for row in range(2, ws.max_row + 1):
-                        ws.cell(row=row, column=2, value='Principal')
-                    needs_save = True
-                    
-                if needs_save:
-                    wb.save(DB_FILE)
-                    print("Migrated database: Updated Citas sheet")
-
-            # Check GastosMensuales sheet
-            try:
-                wb = openpyxl.load_workbook(DB_FILE)
-                if 'GastosMensuales' not in wb.sheetnames:
-                    ws = wb.create_sheet('GastosMensuales')
-                    ws.append(['Sede', 'Mes', 'Tipo', 'Valor', 'Fecha_Registro'])
-                    wb.save(DB_FILE)
-                    print("Migrated database: Added GastosMensuales sheet")
-                else:
-                    # Check columns if needed, strict migration might not be needed if we just created it
-                    pass
-            except Exception as e:
-                print(f"Error checking GastosMensuales: {e}")
-
-        except Exception as e:
-            print(f"Error during migration: {e}")
+def get_db_connection():
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 def init_db():
-    """Initialize the Excel database if it doesn't exist."""
-    if not os.path.exists(DB_FILE):
-        with pd.ExcelWriter(DB_FILE, engine='openpyxl') as writer:
-            pd.DataFrame(columns=['Sede', 'Fecha', 'Estilista', 'Servicio', 'Valor', 'Comision', 'Metodo_Pago']).to_excel(writer, sheet_name='Servicios', index=False)
-            pd.DataFrame(columns=['Sede', 'Fecha', 'Estilista', 'Producto', 'Marca', 'Descripcion', 'Valor', 'Comision', 'Metodo_Pago']).to_excel(writer, sheet_name='Productos', index=False)
-            pd.DataFrame(columns=['Sede', 'Fecha', 'Descripcion', 'Valor']).to_excel(writer, sheet_name='Gastos', index=False)
-            pd.DataFrame(columns=['Sede', 'Producto', 'Marca', 'Descripcion', 'Cantidad', 'Unidad', 'Valor', 'Estado', 'Fecha_Actualizacion']).to_excel(writer, sheet_name='Inventario', index=False)
-            pd.DataFrame(columns=['ID', 'Sede', 'Fecha', 'Hora', 'Cliente', 'Telefono', 'Servicio', 'Notas', 'Estado']).to_excel(writer, sheet_name='Citas', index=False)
-            pd.DataFrame(columns=['Sede', 'Mes', 'Tipo', 'Valor', 'Fecha_Registro']).to_excel(writer, sheet_name='GastosMensuales', index=False)
-        print(f"Database {DB_FILE} created.")
-    else:
-        check_and_migrate_db()
+    """Initialize the SQLite database if it doesn't exist."""
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    # Servicios
+    c.execute('''CREATE TABLE IF NOT EXISTS servicios (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    sede TEXT,
+                    fecha TIMESTAMP,
+                    estilista TEXT,
+                    servicio TEXT,
+                    valor REAL,
+                    comision REAL,
+                    metodo_pago TEXT
+                );''')
+                
+    # Productos
+    c.execute('''CREATE TABLE IF NOT EXISTS productos (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    sede TEXT,
+                    fecha TIMESTAMP,
+                    estilista TEXT,
+                    producto TEXT,
+                    marca TEXT,
+                    descripcion TEXT,
+                    valor REAL,
+                    comision REAL,
+                    metodo_pago TEXT
+                );''')
+
+    # Gastos
+    c.execute('''CREATE TABLE IF NOT EXISTS gastos (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    sede TEXT,
+                    fecha TIMESTAMP,
+                    descripcion TEXT,
+                    valor REAL
+                );''')
+
+    # Inventario
+    c.execute('''CREATE TABLE IF NOT EXISTS inventario (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    sede TEXT,
+                    producto TEXT,
+                    marca TEXT,
+                    descripcion TEXT,
+                    cantidad REAL,
+                    unidad TEXT,
+                    valor REAL,
+                    estado TEXT,
+                    fecha_actualizacion TIMESTAMP
+                );''')
+
+    # Citas
+    c.execute('''CREATE TABLE IF NOT EXISTS citas (
+                    id TEXT PRIMARY KEY,
+                    sede TEXT,
+                    fecha TEXT,
+                    hora TEXT,
+                    cliente TEXT,
+                    telefono TEXT,
+                    servicio TEXT,
+                    notas TEXT,
+                    estado TEXT
+                );''')
+
+    # Gastos Mensuales
+    c.execute('''CREATE TABLE IF NOT EXISTS gastos_mensuales (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    sede TEXT,
+                    mes TEXT,
+                    tipo TEXT,
+                    valor REAL,
+                    fecha_registro TIMESTAMP
+                );''')
+    
+    conn.commit()
+    conn.close()
+    print(f"Database {DB_FILE} initialized.")
 
 
 def get_stylists():
@@ -317,30 +258,25 @@ def save_sedes(sedes):
     with open(SEDES_FILE, 'w', encoding='utf-8') as f:
         json.dump(sedes, f, ensure_ascii=False, indent=2)
 
-def append_to_excel(sheet_name, data):
-    """Append a row of data to the specified sheet in the Excel file."""
+def insert_record(table, data):
+    """Insert a record into the specified SQLite table."""
     try:
-        # Load existing file
-        with pd.ExcelWriter(DB_FILE, engine='openpyxl', mode='a', if_sheet_exists='overlay') as writer:
-            # Load the sheet to find the last row and get column order
-            try:
-                reader = pd.read_excel(DB_FILE, sheet_name=sheet_name)
-                start_row = len(reader) + 1
-                # Get existing column order
-                columns = reader.columns.tolist()
-            except ValueError:
-                start_row = 0
-                # If sheet doesn't exist, use data keys as columns
-                columns = list(data.keys())
-            
-            # Create DataFrame with correct column order
-            df_new = pd.DataFrame([data], columns=columns)
-            
-            # Write the new data
-            df_new.to_excel(writer, sheet_name=sheet_name, index=False, header=False, startrow=start_row)
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # Ensure data keys are lowercase to match SQL columns
+        data = {k.lower(): v for k, v in data.items()}
+        
+        columns = ', '.join(data.keys())
+        placeholders = ', '.join(['?' for _ in data])
+        sql = f'INSERT INTO {table} ({columns}) VALUES ({placeholders})'
+        
+        c.execute(sql, list(data.values()))
+        conn.commit()
+        conn.close()
         return True
     except Exception as e:
-        print(f"Error writing to Excel: {e}")
+        print(f"Error inserting into SQLite: {e}")
         return False
 
 @app.route('/')
@@ -355,6 +291,14 @@ def index():
 @login_required
 def view_certificate():
     return render_template('certificado.html')
+
+@app.route('/admin')
+@login_required
+def admin_panel():
+    stylists = get_stylists()
+    sedes = get_sedes()
+    services = get_services()
+    return render_template('admin.html', stylists=stylists, sedes=sedes, services=services)
 
 @app.route('/certificado/descargar')
 @login_required
@@ -517,7 +461,7 @@ def add_service():
         'Metodo_Pago': metodo_pago
     }
     
-    if append_to_excel('Servicios', record):
+    if insert_record('servicios', record):
         return jsonify({'status': 'success', 'message': 'Servicio registrado', 'comision': comision})
     return jsonify({'status': 'error', 'message': 'Error al guardar'}), 500
 
@@ -543,36 +487,25 @@ def add_product():
         'Metodo_Pago': metodo_pago
     }
     
-    if append_to_excel('Productos', record):
+    if insert_record('productos', record):
         # Update Inventory
         try:
-            df_inv = pd.read_excel(DB_FILE, sheet_name='Inventario')
-            product_name = data['producto']
+            conn = get_db_connection()
+            c = conn.cursor()
             
-            # Filter matches by sede first
-            matches = df_inv[(df_inv['Producto'] == product_name) & (df_inv['Sede'] == sede)]
+            # Use lowercase for column names
+            # Find matching product in inventory at the same sede
+            c.execute('SELECT id, cantidad FROM inventario WHERE producto = ? AND sede = ?', (data['producto'], sede))
+            row = c.fetchone()
             
-            # If marca is provided, try to filter by it too
-            if marca and 'Marca' in df_inv.columns:
-                marca_matches = matches[matches['Marca'] == marca]
-                if not marca_matches.empty:
-                    matches = marca_matches
-            
-            if not matches.empty:
-                # Take the first match
-                idx = matches.index[0]
-                current_qty = float(df_inv.at[idx, 'Cantidad'])
-                
+            if row:
+                current_qty = float(row['cantidad'])
                 if current_qty > 0:
                     new_qty = current_qty - 1
-                    df_inv.at[idx, 'Cantidad'] = new_qty
-                    
-                    if new_qty <= 0:
-                        df_inv.at[idx, 'Estado'] = 'Agotado'
-                    
-                    with pd.ExcelWriter(DB_FILE, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
-                        df_inv.to_excel(writer, sheet_name='Inventario', index=False)
-                        
+                    status = 'Nuevo' if new_qty > 0 else 'Agotado'
+                    c.execute('UPDATE inventario SET cantidad = ?, estado = ? WHERE id = ?', (new_qty, status, row['id']))
+                    conn.commit()
+            conn.close()
         except Exception as e:
             print(f"Error updating inventory: {e}")
             
@@ -591,7 +524,7 @@ def add_expense():
         'Valor': float(data['valor'])
     }
     
-    if append_to_excel('Gastos', record):
+    if insert_record('gastos', record):
         return jsonify({'status': 'success', 'message': 'Gasto registrado'})
     return jsonify({'status': 'error', 'message': 'Error al guardar'}), 500
 
@@ -600,9 +533,11 @@ def add_expense():
 def get_inventory():
     try:
         sede_filter = request.args.get('sede', 'Principal')
-        df = pd.read_excel(DB_FILE, sheet_name='Inventario')
-        # Filter by sede
-        df = df[df['Sede'] == sede_filter]
+        conn = get_db_connection()
+        # Use pandas to read from SQL for easy dictionary conversion
+        df = pd.read_sql('SELECT * FROM inventario WHERE sede = ?', conn, params=(sede_filter,))
+        conn.close()
+        
         # Replace NaN with empty string or 0 for JSON serialization
         df = df.fillna('')
         inventory = df.to_dict(orient='records')
@@ -627,53 +562,41 @@ def add_inventory_item():
         if not producto:
             return jsonify({'status': 'error', 'message': 'Nombre del producto requerido'}), 400
 
-        # Load existing inventory
-        try:
-            df = pd.read_excel(DB_FILE, sheet_name='Inventario')
-        except ValueError:
-            # Sheet might not exist if migration failed or file is weird, but init_db should handle it.
-            df = pd.DataFrame(columns=['Producto', 'Marca', 'Descripcion', 'Cantidad', 'Unidad', 'Valor', 'Estado', 'Fecha_Actualizacion'])
-
+        conn = get_db_connection()
+        c = conn.cursor()
+        
         # Check if product exists to update
-        # Ensure columns exist and fill NaNs for comparison
-        if 'Marca' not in df.columns: df['Marca'] = ''
-        if 'Descripcion' not in df.columns: df['Descripcion'] = ''
+        c.execute('SELECT id FROM inventario WHERE sede = ? AND producto = ? AND marca = ? AND descripcion = ?', 
+                  (sede, producto, marca, descripcion))
+        row = c.fetchone()
         
-        df['Marca'] = df['Marca'].fillna('')
-        df['Descripcion'] = df['Descripcion'].fillna('')
-        
-        # Check for exact match on Sede, Name, Brand, and Description
-        mask = (df['Sede'] == sede) & (df['Producto'] == producto) & (df['Marca'] == marca) & (df['Descripcion'] == descripcion)
-        
-        if mask.any():
+        if row:
             # Update existing
-            idx = df.index[mask].tolist()[0]
-            df.at[idx, 'Cantidad'] = cantidad
-            df.at[idx, 'Unidad'] = unidad
-            df.at[idx, 'Valor'] = valor
-            df.at[idx, 'Estado'] = estado
-            df.at[idx, 'Fecha_Actualizacion'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            c.execute('''UPDATE inventario 
+                         SET cantidad = ?, unidad = ?, valor = ?, estado = ?, fecha_actualizacion = ?
+                         WHERE id = ?''', 
+                      (cantidad, unidad, valor, estado, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), row['id']))
             message = 'Producto actualizado'
         else:
             # Add new
             new_row = {
-                'Sede': sede,
-                'Producto': producto,
-                'Marca': marca,
-                'Descripcion': descripcion,
-                'Cantidad': cantidad,
-                'Unidad': unidad,
-                'Valor': valor,
-                'Estado': estado,
-                'Fecha_Actualizacion': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                'sede': sede,
+                'producto': producto,
+                'marca': marca,
+                'descripcion': descripcion,
+                'cantidad': cantidad,
+                'unidad': unidad,
+                'valor': valor,
+                'estado': estado,
+                'fecha_actualizacion': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             }
-            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+            columns = ', '.join(new_row.keys())
+            placeholders = ', '.join(['?' for _ in new_row])
+            c.execute(f'INSERT INTO inventario ({columns}) VALUES ({placeholders})', list(new_row.values()))
             message = 'Producto agregado al inventario'
             
-        # Save back to Excel
-        with pd.ExcelWriter(DB_FILE, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
-            df.to_excel(writer, sheet_name='Inventario', index=False)
-            
+        conn.commit()
+        conn.close()
         return jsonify({'status': 'success', 'message': message})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
@@ -688,23 +611,17 @@ def delete_inventory_item():
         descripcion = data.get('descripcion', '')
         sede = data.get('sede', 'Principal')
         
-        df = pd.read_excel(DB_FILE, sheet_name='Inventario')
+        conn = get_db_connection()
+        c = conn.cursor()
         
-        # Ensure columns exist
-        if 'Marca' not in df.columns: df['Marca'] = ''
-        if 'Descripcion' not in df.columns: df['Descripcion'] = ''
+        c.execute('DELETE FROM inventario WHERE sede = ? AND producto = ? AND marca = ? AND descripcion = ?', 
+                  (sede, producto, marca, descripcion))
         
-        df['Marca'] = df['Marca'].fillna('')
-        df['Descripcion'] = df['Descripcion'].fillna('')
-        
-        # Filter by sede, producto, marca, descripcion
-        mask = (df['Sede'] == sede) & (df['Producto'] == producto) & (df['Marca'] == marca) & (df['Descripcion'] == descripcion)
-        
-        if mask.any():
-            df = df[~mask]
-            with pd.ExcelWriter(DB_FILE, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
-                df.to_excel(writer, sheet_name='Inventario', index=False)
+        if c.rowcount > 0:
+            conn.commit()
+            conn.close()
             return jsonify({'status': 'success', 'message': 'Producto eliminado del inventario'})
+        conn.close()
         return jsonify({'status': 'error', 'message': 'Producto no encontrado'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
@@ -721,70 +638,69 @@ def get_summary():
         total_comision = 0
         total_gastos = 0
 
+        conn = get_db_connection()
+        
         # Read Services
         try:
-            df_services = pd.read_excel(DB_FILE, sheet_name='Servicios')
-            for idx, row in df_services.iterrows():
-                if str(row['Fecha']).startswith(date_filter) and row['Sede'] == sede_filter:
-                    val = float(row['Valor']) if pd.notna(row['Valor']) else 0.0
-                    com = float(row['Comision']) if pd.notna(row['Comision']) else 0.0
+            # Filter by date and sede using SQL
+            df_services = pd.read_sql("SELECT * FROM servicios WHERE date(fecha) = ? AND sede = ?", 
+                                     conn, params=(date_filter, sede_filter))
+            for _, row in df_services.iterrows():
+                val = float(row['valor']) if pd.notna(row['valor']) else 0.0
+                com = float(row['comision']) if pd.notna(row['comision']) else 0.0
+                metodo = row['metodo_pago'] if pd.notna(row['metodo_pago']) else 'N/A'
                     
-                    metodo = row.get('Metodo_Pago', 'N/A')
-                    if pd.isna(metodo):
-                        metodo = 'N/A'
-                        
-                    summary_data.append({
-                        'id': int(idx),
-                        'sheet': 'Servicios',
-                        'estilista': row['Estilista'],
-                        'descripcion': row['Servicio'],
-                        'valor': val,
-                        'comision': com,
-                        'tipo': 'Servicio',
-                        'metodo_pago': metodo
-                    })
-                    total_valor += val
-                    total_comision += com
+                summary_data.append({
+                    'id': int(row['id']),
+                    'sheet': 'servicios',
+                    'estilista': row['estilista'],
+                    'descripcion': row['servicio'],
+                    'valor': val,
+                    'comision': com,
+                    'tipo': 'Servicio',
+                    'metodo_pago': metodo
+                })
+                total_valor += val
+                total_comision += com
         except Exception as e:
             print(f"Error reading services: {e}")
 
         # Read Products
         try:
-            df_products = pd.read_excel(DB_FILE, sheet_name='Productos')
-            for idx, row in df_products.iterrows():
-                if str(row['Fecha']).startswith(date_filter) and row['Sede'] == sede_filter:
-                    val = float(row['Valor']) if pd.notna(row['Valor']) else 0.0
-                    com = float(row['Comision']) if pd.notna(row['Comision']) else 0.0
-                    
-                    metodo = row.get('Metodo_Pago', 'N/A')
-                    if pd.isna(metodo):
-                        metodo = 'N/A'
+            df_products = pd.read_sql("SELECT * FROM productos WHERE date(fecha) = ? AND sede = ?", 
+                                     conn, params=(date_filter, sede_filter))
+            for _, row in df_products.iterrows():
+                val = float(row['valor']) if pd.notna(row['valor']) else 0.0
+                com = float(row['comision']) if pd.notna(row['comision']) else 0.0
+                metodo = row['metodo_pago'] if pd.notna(row['metodo_pago']) else 'N/A'
 
-                    summary_data.append({
-                        'id': int(idx),
-                        'sheet': 'Productos',
-                        'estilista': row['Estilista'],
-                        'descripcion': row['Producto'],
-                        'valor': val,
-                        'comision': com,
-                        'tipo': 'Producto',
-                        'metodo_pago': metodo
-                    })
-                    total_valor += val
-                    total_comision += com
+                summary_data.append({
+                    'id': int(row['id']),
+                    'sheet': 'productos',
+                    'estilista': row['estilista'],
+                    'descripcion': row['producto'],
+                    'valor': val,
+                    'comision': com,
+                    'tipo': 'Producto',
+                    'metodo_pago': metodo
+                })
+                total_valor += val
+                total_comision += com
         except Exception as e:
             print(f"Error reading products: {e}")
 
         # Read Expenses
         try:
-            df_expenses = pd.read_excel(DB_FILE, sheet_name='Gastos')
+            df_expenses = pd.read_sql("SELECT * FROM gastos WHERE date(fecha) = ? AND sede = ?", 
+                                     conn, params=(date_filter, sede_filter))
             for _, row in df_expenses.iterrows():
-                if str(row['Fecha']).startswith(date_filter) and row['Sede'] == sede_filter:
-                    val = float(row['Valor']) if pd.notna(row['Valor']) else 0.0
-                    total_gastos += val
+                val = float(row['valor']) if pd.notna(row['valor']) else 0.0
+                total_gastos += val
         except Exception as e:
             print(f"Error reading expenses: {e}")
 
+        conn.close()
+        
         # Calculate profit: Net Sales - Expenses - Commissions
         utilidad = total_valor - total_gastos - total_comision
 
@@ -799,6 +715,8 @@ def get_summary():
             }
         })
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/summary/update', methods=['POST'])
@@ -806,33 +724,30 @@ def get_summary():
 def update_summary_item():
     try:
         data = request.json
-        sheet_name = data.get('sheet')
+        table_name = data.get('sheet').lower()
         try:
             row_id = int(data.get('id'))
             new_valor = float(data.get('valor'))
             new_comision = float(data.get('comision'))
         except (ValueError, TypeError):
-             return jsonify({'status': 'error', 'message': 'Invalid numeric data'}), 400
+             return jsonify({'status': 'error', 'message': 'Dato numérico inválido'}), 400
         
-        if sheet_name not in ['Servicios', 'Productos']:
-            return jsonify({'status': 'error', 'message': 'Invalid sheet'}), 400
+        if table_name not in ['servicios', 'productos']:
+            return jsonify({'status': 'error', 'message': 'Tabla inválida'}), 400
             
-        # Read the dataframe
-        df = pd.read_excel(DB_FILE, sheet_name=sheet_name)
+        conn = get_db_connection()
+        c = conn.cursor()
         
-        # Verify index exists
-        if row_id not in df.index:
-            return jsonify({'status': 'error', 'message': 'Item not found'}), 404
-            
-        # Update values
-        df.at[row_id, 'Valor'] = new_valor
-        df.at[row_id, 'Comision'] = new_comision
+        c.execute(f'UPDATE {table_name} SET valor = ?, comision = ? WHERE id = ?', 
+                  (new_valor, new_comision, row_id))
         
-        # Save back
-        with pd.ExcelWriter(DB_FILE, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
-            df.to_excel(writer, sheet_name=sheet_name, index=False)
-            
-        return jsonify({'status': 'success', 'message': 'Item actualizado'})
+        if c.rowcount > 0:
+            conn.commit()
+            conn.close()
+            return jsonify({'status': 'success', 'message': 'Item actualizado'})
+        
+        conn.close()
+        return jsonify({'status': 'error', 'message': 'Item no encontrado'}), 404
             
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
@@ -851,109 +766,93 @@ def render_pdf(template_src, context_dict):
 def export_pdf():
     try:
         date_filter = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
-        
-        # Reuse logic to get data (this could be refactored into a separate function to avoid duplication)
-        # For now, I'll just call the internal logic or copy it. 
-        # Calling the internal logic is cleaner if I extract it, but to minimize changes I will copy the core logic 
-        # or better yet, I will refactor get_summary to return a dict that I can use here.
-        
-        # Let's do a quick extraction of the data gathering logic to avoid code duplication? 
-        # Actually, for safety and speed, I will duplicate the data gathering logic here slightly modified for Python usage 
-        # (not returning jsonify) or just call the same logic.
+        sede_filter = request.args.get('sede', 'Principal')
         
         summary_data = []
         total_valor = 0
         total_comision = 0
         total_gastos = 0
 
+        conn = get_db_connection()
+        
         # Read Services
         try:
-            df_services = pd.read_excel(DB_FILE, sheet_name='Servicios')
+            df_services = pd.read_sql("SELECT * FROM servicios WHERE date(fecha) = ? AND sede = ?", 
+                                     conn, params=(date_filter, sede_filter))
             for _, row in df_services.iterrows():
-                if str(row['Fecha']).startswith(date_filter):
-                    val = float(row['Valor']) if pd.notna(row['Valor']) else 0.0
-                    com = float(row['Comision']) if pd.notna(row['Comision']) else 0.0
-                    metodo = row.get('Metodo_Pago', 'N/A')
-                    if pd.isna(metodo): metodo = 'N/A'
-                        
-                    summary_data.append({
-                        'estilista': row['Estilista'],
-                        'descripcion': row['Servicio'],
-                        'valor': val,
-                        'comision': com,
-                        'tipo': 'Servicio',
-                        'metodo_pago': metodo
-                    })
-                    total_valor += val
-                    total_comision += com
+                val = float(row['valor']) if pd.notna(row['valor']) else 0.0
+                com = float(row['comision']) if pd.notna(row['comision']) else 0.0
+                metodo = row['metodo_pago'] if pd.notna(row['metodo_pago']) else 'N/A'
+                    
+                summary_data.append({
+                    'estilista': row['estilista'],
+                    'descripcion': row['servicio'],
+                    'valor': val,
+                    'comision': com,
+                    'tipo': 'Servicio',
+                    'metodo_pago': metodo
+                })
+                total_valor += val
+                total_comision += com
         except: pass
 
         # Read Products
         try:
-            df_products = pd.read_excel(DB_FILE, sheet_name='Productos')
+            df_products = pd.read_sql("SELECT * FROM productos WHERE date(fecha) = ? AND sede = ?", 
+                                     conn, params=(date_filter, sede_filter))
             for _, row in df_products.iterrows():
-                if str(row['Fecha']).startswith(date_filter):
-                    val = float(row['Valor']) if pd.notna(row['Valor']) else 0.0
-                    com = float(row['Comision']) if pd.notna(row['Comision']) else 0.0
-                    metodo = row.get('Metodo_Pago', 'N/A')
-                    if pd.isna(metodo): metodo = 'N/A'
+                val = float(row['valor']) if pd.notna(row['valor']) else 0.0
+                com = float(row['comision']) if pd.notna(row['comision']) else 0.0
+                metodo = row['metodo_pago'] if pd.notna(row['metodo_pago']) else 'N/A'
 
-                    summary_data.append({
-                        'estilista': row['Estilista'],
-                        'descripcion': row['Producto'],
-                        'valor': val,
-                        'comision': com,
-                        'tipo': 'Producto',
-                        'metodo_pago': metodo
-                    })
-                    total_valor += val
-                    total_comision += com
+                summary_data.append({
+                    'estilista': row['estilista'],
+                    'descripcion': row['producto'],
+                    'valor': val,
+                    'comision': com,
+                    'tipo': 'Producto',
+                    'metodo_pago': metodo
+                })
+                total_valor += val
+                total_comision += com
         except: pass
 
         # Read Expenses
         try:
-            df_expenses = pd.read_excel(DB_FILE, sheet_name='Gastos')
+            df_expenses = pd.read_sql("SELECT * FROM gastos WHERE date(fecha) = ? AND sede = ?", 
+                                     conn, params=(date_filter, sede_filter))
             for _, row in df_expenses.iterrows():
-                if str(row['Fecha']).startswith(date_filter):
-                    val = float(row['Valor']) if pd.notna(row['Valor']) else 0.0
-                    total_gastos += val
+                val = float(row['valor']) if pd.notna(row['valor']) else 0.0
+                total_gastos += val
         except: pass
 
+        conn.close()
+        
         utilidad = total_valor - total_gastos - total_comision
         
-        totals = {
-            'valor': total_valor,
-            'comision': total_comision,
-            'gastos': total_gastos,
-            'utilidad': utilidad
-        }
-
-        # Logo path
-        logo_path = os.path.join(app.root_path, 'Logo', 'Magical_Hair.png')
-        # Check if exists, if not try .ico or None
-        if not os.path.exists(logo_path):
-             logo_path = os.path.join(app.root_path, 'Logo', 'Magical_Hair.ico')
-             if not os.path.exists(logo_path):
-                 logo_path = None
-
         context = {
-            'data': summary_data,
-            'totals': totals,
             'date': date_filter,
-            'logo_path': logo_path,
-            'generation_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            'sede': sede_filter,
+            'summary': summary_data,
+            'totals': {
+                'valor': total_valor,
+                'comision': total_comision,
+                'gastos': total_gastos,
+                'utilidad': utilidad
+            }
         }
-
+        
         pdf = render_pdf('pdf_report.html', context)
         if pdf:
             response = make_response(pdf)
             response.headers['Content-Type'] = 'application/pdf'
-            response.headers['Content-Disposition'] = f'attachment; filename=Cierre_{date_filter}.pdf'
+            response.headers['Content-Disposition'] = f'attachment; filename=Cierre_{sede_filter}_{date_filter}.pdf'
             return response
         
         return "Error generating PDF", 500
-
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return str(e), 500
 
 @app.route('/api/statistics', methods=['GET'])
@@ -965,70 +864,75 @@ def get_statistics():
         year, month = month_filter.split('-')
         sede_filter = request.args.get('sede', '') # Optional sede filter
         
-        # Read all sheets
-        servicios_df = pd.read_excel(DB_FILE, sheet_name='Servicios')
-        productos_df = pd.read_excel(DB_FILE, sheet_name='Productos')
-        gastos_df = pd.read_excel(DB_FILE, sheet_name='Gastos')
-        inventario_df = pd.read_excel(DB_FILE, sheet_name='Inventario')
+        conn = get_db_connection()
         
-        try:
-            gastos_mensuales_df = pd.read_excel(DB_FILE, sheet_name='GastosMensuales')
-        except ValueError:
-            gastos_mensuales_df = pd.DataFrame(columns=['Sede', 'Mes', 'Tipo', 'Valor'])
+        # Read data from SQLite
+        servicios_df = pd.read_sql("SELECT * FROM servicios", conn)
+        productos_df = pd.read_sql("SELECT * FROM productos", conn)
+        gastos_df = pd.read_sql("SELECT * FROM gastos", conn)
+        inventario_df = pd.read_sql("SELECT * FROM inventario", conn)
+        gastos_mensuales_df = pd.read_sql("SELECT * FROM gastos_mensuales", conn)
+        
+        conn.close()
         
         # Apply Sede Filter if provided
         if sede_filter:
-             servicios_df = servicios_df[servicios_df['Sede'] == sede_filter]
-             productos_df = productos_df[productos_df['Sede'] == sede_filter]
-             gastos_df = gastos_df[gastos_df['Sede'] == sede_filter]
-             inventario_df = inventario_df[inventario_df['Sede'] == sede_filter]
-             gastos_mensuales_df = gastos_mensuales_df[gastos_mensuales_df['Sede'] == sede_filter]
+             servicios_df = servicios_df[servicios_df['sede'] == sede_filter]
+             productos_df = productos_df[productos_df['sede'] == sede_filter]
+             gastos_df = gastos_df[gastos_df['sede'] == sede_filter]
+             inventario_df = inventario_df[inventario_df['sede'] == sede_filter]
+             gastos_mensuales_df = gastos_mensuales_df[gastos_mensuales_df['sede'] == sede_filter]
 
-        # Filter by month
-        servicios_df['Fecha'] = pd.to_datetime(servicios_df['Fecha'])
-        productos_df['Fecha'] = pd.to_datetime(productos_df['Fecha'])
-        gastos_df['Fecha'] = pd.to_datetime(gastos_df['Fecha'])
+        # Filter by month with robust date parsing
+        servicios_df['fecha'] = pd.to_datetime(servicios_df['fecha'], errors='coerce')
+        productos_df['fecha'] = pd.to_datetime(productos_df['fecha'], errors='coerce')
+        gastos_df['fecha'] = pd.to_datetime(gastos_df['fecha'], errors='coerce')
         
-        servicios_month = servicios_df[(servicios_df['Fecha'].dt.year == int(year)) & 
-                                       (servicios_df['Fecha'].dt.month == int(month))]
-        productos_month = productos_df[(productos_df['Fecha'].dt.year == int(year)) & 
-                                       (productos_df['Fecha'].dt.month == int(month))]
-        gastos_month = gastos_df[(gastos_df['Fecha'].dt.year == int(year)) & 
-                                 (gastos_df['Fecha'].dt.month == int(month))]
+        # Drop rows with invalid dates if any
+        servicios_df = servicios_df.dropna(subset=['fecha'])
+        productos_df = productos_df.dropna(subset=['fecha'])
+        gastos_df = gastos_df.dropna(subset=['fecha'])
         
-        # Gastos Mensuales (Fixed)
-        gastos_mensuales_month = gastos_mensuales_df[gastos_mensuales_df['Mes'] == month_filter]
+        servicios_month = servicios_df[(servicios_df['fecha'].dt.year == int(year)) & 
+                                       (servicios_df['fecha'].dt.month == int(month))]
+        productos_month = productos_df[(productos_df['fecha'].dt.year == int(year)) & 
+                                       (productos_df['fecha'].dt.month == int(month))]
+        gastos_month = gastos_df[(gastos_df['fecha'].dt.year == int(year)) & 
+                                 (gastos_df['fecha'].dt.month == int(month))]
+        
+        # Gastos Mensuales
+        gastos_mensuales_month = gastos_mensuales_df[gastos_mensuales_df['mes'] == month_filter]
 
         # Calculate totals
-        total_ventas = servicios_month['Valor'].sum() + productos_month['Valor'].sum()
-        total_gastos = gastos_month['Valor'].sum()
-        total_nomina = servicios_month['Comision'].sum() + productos_month['Comision'].sum()
+        total_ventas = servicios_month['valor'].sum() + productos_month['valor'].sum()
+        total_gastos = gastos_month['valor'].sum()
+        total_nomina = servicios_month['comision'].sum() + productos_month['comision'].sum()
         utilidad_operativa = total_ventas - total_gastos - total_nomina
         
-        total_gastos_fijos = gastos_mensuales_month['Valor'].sum()
+        total_gastos_fijos = gastos_mensuales_month['valor'].sum()
         utilidad_real = utilidad_operativa - total_gastos_fijos
         
         # Nómina por estilista
-        nomina_servicios = servicios_month.groupby('Estilista')['Comision'].sum()
-        nomina_productos = productos_month.groupby('Estilista')['Comision'].sum()
+        nomina_servicios = servicios_month.groupby('estilista')['comision'].sum()
+        nomina_productos = productos_month.groupby('estilista')['comision'].sum()
         nomina_por_estilista = (nomina_servicios.add(nomina_productos, fill_value=0)).to_dict()
         
         # Ventas por estilista
-        ventas_servicios = servicios_month.groupby('Estilista')['Valor'].sum()
-        ventas_productos = productos_month.groupby('Estilista')['Valor'].sum()
+        ventas_servicios = servicios_month.groupby('estilista')['valor'].sum()
+        ventas_productos = productos_month.groupby('estilista')['valor'].sum()
         ventas_por_estilista = (ventas_servicios.add(ventas_productos, fill_value=0)).to_dict()
         
         # Inventario resumido - Agrupado por producto
         inventario_agrupado = {}
         for _, row in inventario_df.iterrows():
             try:
-                producto = row['Producto'] if pd.notna(row['Producto']) else ''
+                producto = row['producto'] if pd.notna(row['producto']) else ''
                 if not producto:
                     continue
                     
-                cantidad = float(row['Cantidad']) if pd.notna(row['Cantidad']) else 0.0
-                valor = float(row['Valor']) if pd.notna(row['Valor']) else 0.0
-                unidad = row['Unidad'] if pd.notna(row['Unidad']) else ''
+                cantidad = float(row['cantidad']) if pd.notna(row['cantidad']) else 0.0
+                valor = float(row['valor']) if pd.notna(row['valor']) else 0.0
+                unidad = row['unidad'] if pd.notna(row['unidad']) else ''
                 
                 # Si el producto ya existe, sumar las cantidades y valores
                 if producto in inventario_agrupado:
@@ -1054,24 +958,24 @@ def get_statistics():
         
         for m in range(1, 13):
             try:
-                s_month = servicios_df[(servicios_df['Fecha'].dt.year == int(year)) & 
-                                       (servicios_df['Fecha'].dt.month == m)]
-                p_month = productos_df[(productos_df['Fecha'].dt.year == int(year)) & 
-                                       (productos_df['Fecha'].dt.month == m)]
-                total = s_month['Valor'].sum() + p_month['Valor'].sum()
+                s_month = servicios_df[(servicios_df['fecha'].dt.year == int(year)) & 
+                                       (servicios_df['fecha'].dt.month == m)]
+                p_month = productos_df[(productos_df['fecha'].dt.year == int(year)) & 
+                                       (productos_df['fecha'].dt.month == m)]
+                total = s_month['valor'].sum() + p_month['valor'].sum()
                 ventas_anuales.append(float(total))
             except:
                  ventas_anuales.append(0.0)
             
         # Top Servicios (Frecuencia)
-        top_servicios = servicios_month['Servicio'].value_counts().head(10).to_dict()
+        top_servicios = servicios_month['servicio'].value_counts().head(10).to_dict()
         
         # Estado Inventario
         disponibles = 0
         agotados = 0
         for _, row in inventario_df.iterrows():
             try:
-                qty = float(row['Cantidad']) if pd.notna(row['Cantidad']) else 0
+                qty = float(row['cantidad']) if pd.notna(row['cantidad']) else 0
                 if qty > 0:
                     disponibles += 1
                 else:
@@ -1095,7 +999,7 @@ def get_statistics():
                     'gastos_fijos': float(total_gastos_fijos),
                     'utilidad_real': float(utilidad_real)
                 },
-                'gastos_mensuales_detalle': gastos_mensuales_month[['Tipo', 'Valor']].to_dict(orient='records'),
+                'gastos_mensuales_detalle': gastos_mensuales_month[['tipo', 'valor']].to_dict(orient='records'),
                 'nomina_por_estilista': {k: float(v) for k, v in nomina_por_estilista.items()},
                 'ventas_por_estilista': {k: float(v) for k, v in ventas_por_estilista.items()},
                 'top_servicios': top_servicios,
@@ -1109,6 +1013,8 @@ def get_statistics():
         })
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
@@ -1119,18 +1025,18 @@ def add_appointment():
         data = request.json
         sede = data.get('sede', 'Principal')
         record = {
-            'ID': str(uuid.uuid4()),
-            'Sede': sede,
-            'Fecha': data['fecha'],
-            'Hora': data['hora'],
-            'Cliente': data['cliente'],
-            'Telefono': data['telefono'],
-            'Servicio': data['servicio'],
-            'Notas': data.get('notas', ''),
-            'Estado': 'Pendiente'
+            'id': str(uuid.uuid4()),
+            'sede': sede,
+            'fecha': data['fecha'],
+            'hora': data['hora'],
+            'cliente': data['cliente'],
+            'telefono': data['telefono'],
+            'servicio': data['servicio'],
+            'notas': data.get('notas', ''),
+            'estado': 'Pendiente'
         }
         
-        if append_to_excel('Citas', record):
+        if insert_record('citas', record):
             return jsonify({'status': 'success', 'message': 'Cita agendada correctamente'})
         return jsonify({'status': 'error', 'message': 'Error al guardar la cita'}), 500
     except Exception as e:
@@ -1139,23 +1045,15 @@ def add_appointment():
 @app.route('/api/appointment/<appointment_id>', methods=['DELETE'])
 def delete_appointment(appointment_id):
     try:
-        wb = openpyxl.load_workbook(DB_FILE)
-        ws = wb['Citas']
-        
-        # Find row by ID (assuming ID is in column 1)
-        row_to_delete = None
-        for row in range(2, ws.max_row + 1):
-            if str(ws.cell(row=row, column=1).value) == appointment_id:
-                row_to_delete = row
-                break
-        
-        if row_to_delete:
-            ws.delete_rows(row_to_delete)
-            wb.save(DB_FILE)
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('DELETE FROM citas WHERE id = ?', (appointment_id,))
+        if c.rowcount > 0:
+            conn.commit()
+            conn.close()
             return jsonify({'status': 'success', 'message': 'Cita eliminada correctamente'})
-        else:
-            return jsonify({'status': 'error', 'message': 'Cita no encontrada'}), 404
-            
+        conn.close()
+        return jsonify({'status': 'error', 'message': 'Cita no encontrada'}), 404
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -1163,30 +1061,50 @@ def delete_appointment(appointment_id):
 def update_appointment(appointment_id):
     try:
         data = request.json
-        wb = openpyxl.load_workbook(DB_FILE)
-        ws = wb['Citas']
+        conn = get_db_connection()
+        c = conn.cursor()
         
-        # Find row by ID
-        row_to_update = None
-        for row in range(2, ws.max_row + 1):
-            if str(ws.cell(row=row, column=1).value) == appointment_id:
-                row_to_update = row
-                break
-        
-        if row_to_update:
-            # Map fields to columns (assuming order: ID, Fecha, Hora, Cliente, Telefono, Servicio, Notas, Estado)
-            # 1-based indexing
-            if 'fecha' in data: ws.cell(row=row_to_update, column=2, value=data['fecha'])
-            if 'hora' in data: ws.cell(row=row_to_update, column=3, value=data['hora'])
-            if 'cliente' in data: ws.cell(row=row_to_update, column=4, value=data['cliente'])
-            if 'telefono' in data: ws.cell(row=row_to_update, column=5, value=data['telefono'])
-            if 'servicio' in data: ws.cell(row=row_to_update, column=6, value=data['servicio'])
-            if 'notas' in data: ws.cell(row=row_to_update, column=7, value=data.get('notas', ''))
-            
-            wb.save(DB_FILE)
-            return jsonify({'status': 'success', 'message': 'Cita actualizada correctamente'})
+        # Check if updating only status or multiple fields
+        if 'estado' in data and len(data) == 1:
+            c.execute('UPDATE citas SET estado = ? WHERE id = ?', (data['estado'], appointment_id))
         else:
-            return jsonify({'status': 'error', 'message': 'Cita no encontrada'}), 404
+            # Multi-field update (from original code logic)
+            fields = []
+            values = []
+            if 'fecha' in data:
+                fields.append('fecha = ?')
+                values.append(data['fecha'])
+            if 'hora' in data:
+                fields.append('hora = ?')
+                values.append(data['hora'])
+            if 'cliente' in data:
+                fields.append('cliente = ?')
+                values.append(data['cliente'])
+            if 'telefono' in data:
+                fields.append('telefono = ?')
+                values.append(data['telefono'])
+            if 'servicio' in data:
+                fields.append('servicio = ?')
+                values.append(data['servicio'])
+            if 'notas' in data:
+                fields.append('notas = ?')
+                values.append(data['notas'])
+            if 'estado' in data:
+                fields.append('estado = ?')
+                values.append(data['estado'])
+            
+            if fields:
+                values.append(appointment_id)
+                query = f"UPDATE citas SET {', '.join(fields)} WHERE id = ?"
+                c.execute(query, values)
+        
+        if c.rowcount > 0:
+            conn.commit()
+            conn.close()
+            return jsonify({'status': 'success', 'message': 'Cita actualizada correctamente'})
+        
+        conn.close()
+        return jsonify({'status': 'error', 'message': 'Cita no encontrada'}), 404
             
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
@@ -1197,46 +1115,24 @@ def get_appointments():
         date_filter = request.args.get('date')
         sede_filter = request.args.get('sede', 'Principal')
         
-        try:
-            df = pd.read_excel(DB_FILE, sheet_name='Citas')
-        except ValueError:
-            return jsonify({'status': 'success', 'data': []})
+        conn = get_db_connection()
+        query = "SELECT * FROM citas WHERE sede = ?"
+        params = [sede_filter]
+        
+        if date_filter:
+            query += " AND date(fecha) = ?"
+            params.append(date_filter)
+            
+        df = pd.read_sql(query, conn, params=params)
+        conn.close()
             
         df = df.fillna('')
         
-        # Robust Sede filtering
-        if 'Sede' in df.columns:
-            # Convert to string and strip whitespace for robust comparison
-            df['Sede'] = df['Sede'].astype(str).str.strip()
-            df = df[df['Sede'] == sede_filter]
-        
-        if date_filter:
-            # Robust Date filtering
-            # Convert both column and filter to datetime to compare
-            try:
-                # Convert column to datetime, coerce errors to NaT
-                df['Fecha_DT'] = pd.to_datetime(df['Fecha'], errors='coerce')
-                
-                # Create filter date object
-                filter_date = pd.to_datetime(date_filter)
-                
-                # Filter rows where valid dates match
-                # Check where expected format matches YYYY-MM-DD
-                df = df[df['Fecha_DT'].dt.strftime('%Y-%m-%d') == filter_date.strftime('%Y-%m-%d')]
-            except Exception as e:
-                # Fallback to string comparison if datetime conversion fails completely
-                df['Fecha'] = df['Fecha'].astype(str).str.strip()
-                df = df[df['Fecha'] == date_filter]
-            
         # Sort by Time
         try:
-            df = df.sort_values('Hora')
+            df = df.sort_values('hora')
         except:
             pass
-
-        # Cleanup temporary column before conversion
-        if 'Fecha_DT' in df.columns:
-            df = df.drop(columns=['Fecha_DT'])
 
         appointments = df.to_dict(orient='records')
         return jsonify({'status': 'success', 'data': appointments})
@@ -1248,20 +1144,15 @@ def get_alerts():
     try:
         today = datetime.now().strftime('%Y-%m-%d')
         
-        try:
-            df = pd.read_excel(DB_FILE, sheet_name='Citas')
-        except ValueError:
-            return jsonify({'status': 'success', 'alerts': []})
-            
-        df = df.fillna('')
-        df['Fecha'] = df['Fecha'].astype(str)
-        
-        # Filter for today
-        today_appointments = df[df['Fecha'] == today]
+        conn = get_db_connection()
+        query = "SELECT count(*) as count FROM citas WHERE date(fecha) = ?"
+        c = conn.cursor()
+        c.execute(query, (today,))
+        count = c.fetchone()['count']
+        conn.close()
         
         alerts = []
-        if not today_appointments.empty:
-            count = len(today_appointments)
+        if count > 0:
             alerts.append({
                 'type': 'info',
                 'message': f'Tienes {count} cita(s) programada(s) para hoy.'
@@ -1283,12 +1174,9 @@ def add_update_monthly_expenses():
         if not mes or not expenses:
              return jsonify({'status': 'error', 'message': 'Datos incompletos'}), 400
 
-        # Load existing data
-        try:
-            df = pd.read_excel(DB_FILE, sheet_name='GastosMensuales')
-        except ValueError:
-            df = pd.DataFrame(columns=['Sede', 'Mes', 'Tipo', 'Valor', 'Fecha_Registro'])
-
+        conn = get_db_connection()
+        c = conn.cursor()
+        
         # Create a timestamp
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
@@ -1298,28 +1186,23 @@ def add_update_monthly_expenses():
             valor = float(exp['valor'])
             
             # Check if exists
-            mask = (df['Sede'] == sede) & (df['Mes'] == mes) & (df['Tipo'] == tipo)
+            c.execute('SELECT id FROM gastos_mensuales WHERE sede = ? AND mes = ? AND tipo = ?', 
+                      (sede, mes, tipo))
+            row = c.fetchone()
             
-            if mask.any():
+            if row:
                 # Update
-                idx = df.index[mask].tolist()[0]
-                df.at[idx, 'Valor'] = valor
-                df.at[idx, 'Fecha_Registro'] = now
+                c.execute('UPDATE gastos_mensuales SET valor = ?, fecha_registro = ? WHERE id = ?', 
+                          (valor, now, row['id']))
             else:
                 # Add new
-                new_row = {
-                    'Sede': sede,
-                    'Mes': mes,
-                    'Tipo': tipo,
-                    'Valor': valor,
-                    'Fecha_Registro': now
-                }
-                df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+                c.execute('INSERT INTO gastos_mensuales (sede, mes, tipo, valor, fecha_registro) VALUES (?, ?, ?, ?, ?)', 
+                          (sede, mes, tipo, valor, now))
 
-        with pd.ExcelWriter(DB_FILE, engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
-            df.to_excel(writer, sheet_name='GastosMensuales', index=False)
+        conn.commit()
+        conn.close()
             
-        return jsonify({'status': 'success', 'message': 'Gastos mensuales guardados correctamentos'})
+        return jsonify({'status': 'success', 'message': 'Gastos mensuales guardados correctamente'})
 
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
@@ -1331,19 +1214,18 @@ def get_monthly_expenses():
         sede = request.args.get('sede', 'Principal')
         mes = request.args.get('mes') # YYYY-MM
         
-        try:
-            df = pd.read_excel(DB_FILE, sheet_name='GastosMensuales')
-        except ValueError:
-            return jsonify({'status': 'success', 'data': []})
+        conn = get_db_connection()
+        query = "SELECT * FROM gastos_mensuales WHERE sede = ?"
+        params = [sede]
+        
+        if mes:
+            query += " AND mes = ?"
+            params.append(mes)
+            
+        df = pd.read_sql(query, conn, params=params)
+        conn.close()
             
         df = df.fillna('')
-        
-        # Filter
-        if mes:
-            df = df[(df['Sede'] == sede) & (df['Mes'] == mes)]
-        else:
-             df = df[df['Sede'] == sede]
-             
         data = df.to_dict(orient='records')
         return jsonify({'status': 'success', 'data': data})
         
@@ -1356,45 +1238,48 @@ def get_prediction():
     try:
         sede_filter = request.args.get('sede', 'Principal')
         
+        conn = get_db_connection()
         # Load data
-        df_servicios = pd.read_excel(DB_FILE, sheet_name='Servicios')
-        df_productos = pd.read_excel(DB_FILE, sheet_name='Productos')
+        df_servicios = pd.read_sql("SELECT fecha, valor FROM servicios WHERE sede = ?", conn, params=(sede_filter,))
+        df_productos = pd.read_sql("SELECT fecha, valor FROM productos WHERE sede = ?", conn, params=(sede_filter,))
+        conn.close()
         
-        # Filter by sede
-        df_servicios = df_servicios[df_servicios['Sede'] == sede_filter]
-        df_productos = df_productos[df_productos['Sede'] == sede_filter]
+        # Convert fecha to datetime and floor to date
+        df_servicios['fecha'] = pd.to_datetime(df_servicios['fecha'], errors='coerce')
+        df_productos['fecha'] = pd.to_datetime(df_productos['fecha'], errors='coerce')
         
-        # Convert Fecha to datetime and floor to date
-        df_servicios['Fecha'] = pd.to_datetime(df_servicios['Fecha']).dt.date
-        df_productos['Fecha'] = pd.to_datetime(df_productos['Fecha']).dt.date
+        # Drop invalid dates and convert to date object
+        df_servicios = df_servicios.dropna(subset=['fecha'])
+        df_productos = df_productos.dropna(subset=['fecha'])
+        
+        df_servicios['fecha'] = df_servicios['fecha'].dt.date
+        df_productos['fecha'] = df_productos['fecha'].dt.date
         
         # Aggregate by date
-        daily_servicios = df_servicios.groupby('Fecha')['Valor'].sum()
-        daily_productos = df_productos.groupby('Fecha')['Valor'].sum()
+        daily_servicios = df_servicios.groupby('fecha')['valor'].sum()
+        daily_productos = df_productos.groupby('fecha')['valor'].sum()
         
         # Combine
         daily_income = daily_servicios.add(daily_productos, fill_value=0).sort_index()
         
         # Convert to DataFrame
         income_df = daily_income.reset_index()
-        income_df.columns = ['Fecha', 'Valor']
+        income_df.columns = ['fecha', 'valor']
         
         # Get last 60 days of data
         today = datetime.now().date()
         sixty_days_ago = today - pd.Timedelta(days=60)
-        income_df = income_df[income_df['Fecha'] >= sixty_days_ago]
+        income_df = income_df[income_df['fecha'] >= sixty_days_ago]
         
         if income_df.empty:
             return jsonify({'status': 'success', 'historical': [], 'prediction': []})
             
         # Prepare for prediction (Linear Regression)
-        # Using ordinal dates as X
         import numpy as np
-        from datetime import date
         
-        income_df['Ordinal'] = income_df['Fecha'].apply(lambda x: x.toordinal())
-        X = income_df['Ordinal'].values.reshape(-1, 1)
-        y = income_df['Valor'].values
+        income_df['ordinal'] = income_df['fecha'].apply(lambda x: x.toordinal())
+        X = income_df['ordinal'].values.reshape(-1, 1)
+        y = income_df['valor'].values
         
         # Simple Linear Regression: y = mx + b
         if len(income_df) > 1:
@@ -1417,7 +1302,7 @@ def get_prediction():
             
         # Generate next 7 days
         predictions = []
-        last_date = income_df['Fecha'].max()
+        last_date = income_df['fecha'].max()
         for i in range(1, 8):
             pred_date = last_date + pd.Timedelta(days=i)
             pred_ordinal = pred_date.toordinal()
@@ -1430,8 +1315,8 @@ def get_prediction():
         historical = []
         for _, row in income_df.iterrows():
             historical.append({
-                'fecha': row['Fecha'].strftime('%Y-%m-%d'),
-                'valor': float(row['Valor'])
+                'fecha': row['fecha'].strftime('%Y-%m-%d'),
+                'valor': float(row['valor'])
             })
             
         return jsonify({
@@ -1452,52 +1337,56 @@ def get_revenue_patterns():
     try:
         sede_filter = request.args.get('sede', 'Principal')
         
+        conn = get_db_connection()
         # Load data
-        df_servicios = pd.read_excel(DB_FILE, sheet_name='Servicios')
-        df_productos = pd.read_excel(DB_FILE, sheet_name='Productos')
+        df_servicios = pd.read_sql("SELECT fecha, valor FROM servicios WHERE sede = ?", conn, params=(sede_filter,))
+        df_productos = pd.read_sql("SELECT fecha, valor FROM productos WHERE sede = ?", conn, params=(sede_filter,))
+        conn.close()
         
-        # Filter by sede
-        df_servicios = df_servicios[df_servicios['Sede'] == sede_filter]
-        df_productos = df_productos[df_productos['Sede'] == sede_filter]
+        # Convert fecha
+        df_servicios['fecha'] = pd.to_datetime(df_servicios['fecha'], errors='coerce')
+        df_productos['fecha'] = pd.to_datetime(df_productos['fecha'], errors='coerce')
         
-        # Convert Fecha
-        df_servicios['Fecha'] = pd.to_datetime(df_servicios['Fecha']).dt.date
-        df_productos['Fecha'] = pd.to_datetime(df_productos['Fecha']).dt.date
+        # Drop invalid and convert to date
+        df_servicios = df_servicios.dropna(subset=['fecha'])
+        df_productos = df_productos.dropna(subset=['fecha'])
+        
+        df_servicios['fecha'] = df_servicios['fecha'].dt.date
+        df_productos['fecha'] = df_productos['fecha'].dt.date
         
         # Group by date
-        daily_servicios = df_servicios.groupby('Fecha')['Valor'].sum()
-        daily_productos = df_productos.groupby('Fecha')['Valor'].sum()
+        daily_servicios = df_servicios.groupby('fecha')['valor'].sum()
+        daily_productos = df_productos.groupby('fecha')['valor'].sum()
         
         daily_revenue = daily_servicios.add(daily_productos, fill_value=0).sort_index()
         
         # Reset index
         df = daily_revenue.reset_index()
-        df.columns = ['Fecha', 'Valor']
+        df.columns = ['fecha', 'valor']
         
         # Filter last 60 days
         today = datetime.now().date()
         sixty_days_ago = today - pd.Timedelta(days=60)
-        df = df[df['Fecha'] >= sixty_days_ago]
+        df = df[df['fecha'] >= sixty_days_ago]
         
         if df.empty:
             return jsonify({'status': 'success', 'heatmap': [], 'patterns': {}, 'inference': 'Datos insuficientes'})
             
         # 1. Heatmap Data (Week vs Day)
-        # We can simulate a heatmap structure: Week Number vs Day of Week
         heatmap_data = []
         for _, row in df.iterrows():
-            dt = pd.to_datetime(row['Fecha'])
+            dt = pd.to_datetime(row['fecha'])
             heatmap_data.append({
-                'date': row['Fecha'].strftime('%Y-%m-%d'),
-                'day': dt.day_name(), # English name, we will translate in JS or here
+                'date': row['fecha'].strftime('%Y-%m-%d'),
+                'day': dt.day_name(), 
                 'day_index': dt.dayofweek, # 0=Mon
-                'week': dt.isocalendar()[1],
-                'value': float(row['Valor'])
+                'week': int(dt.isocalendar()[1]),
+                'value': float(row['valor'])
             })
             
-        # 2. Average Stats by Day of Week (Inference Basis)
-        df['DayOfWeek'] = pd.to_datetime(df['Fecha']).dt.dayofweek
-        patterns = df.groupby('DayOfWeek')['Valor'].mean().to_dict()
+        # 2. Average Stats by Day of Week
+        df['dayofweek'] = pd.to_datetime(df['fecha']).dt.dayofweek
+        patterns = df.groupby('dayofweek')['valor'].mean().to_dict()
         
         day_map = {0: 'Lunes', 1: 'Martes', 2: 'Miércoles', 3: 'Jueves', 4: 'Viernes', 5: 'Sábado', 6: 'Domingo'}
         named_patterns = {day_map[k]: float(v) for k, v in patterns.items()}
@@ -1531,30 +1420,25 @@ def get_revenue_patterns():
 def get_service_demand():
     try:
         import numpy as np
-        sede_filter = request.args.get('sede', 'Bolivia')
+        sede_filter = request.args.get('sede', 'Principal')
         
+        conn = get_db_connection()
         # Load services data
-        try:
-            df_servicios = pd.read_excel(DB_FILE, sheet_name='Servicios')
-        except ValueError:
+        df_servicios = pd.read_sql("SELECT fecha, servicio, sede FROM servicios WHERE sede = ?", conn, params=(sede_filter,))
+        conn.close()
+        
+        if df_servicios.empty:
              return jsonify({'status': 'success', 'historical': [], 'prediction': [], 'growthService': None})
 
-        # Filter by sede
-        if 'Sede' in df_servicios.columns:
-            df_servicios = df_servicios[df_servicios['Sede'] == sede_filter]
-            if df_servicios.empty:
-                # If no data for this sede, use all data
-                df_servicios = pd.read_excel(DB_FILE, sheet_name='Servicios')
-            
-        # Convert Fecha
-        df_servicios['Fecha'] = pd.to_datetime(df_servicios['Fecha'], errors='coerce')
-        df_servicios = df_servicios.dropna(subset=['Fecha'])
-        df_servicios['Fecha'] = df_servicios['Fecha'].dt.date
+        # Convert fecha
+        df_servicios['fecha'] = pd.to_datetime(df_servicios['fecha'], errors='coerce')
+        df_servicios = df_servicios.dropna(subset=['fecha'])
+        df_servicios['fecha'] = df_servicios['fecha'].dt.date
         
         # Filter last 60 days
         today = datetime.now().date()
         sixty_days_ago = today - pd.Timedelta(days=60)
-        df_recent = df_servicios[df_servicios['Fecha'] >= sixty_days_ago].copy()
+        df_recent = df_servicios[df_servicios['fecha'] >= sixty_days_ago].copy()
         
         if df_recent.empty:
             return jsonify({'status': 'success', 'historical': [], 'prediction': [], 'growthService': None})
@@ -1568,28 +1452,23 @@ def get_service_demand():
             if 'depilacion' in name or 'cejas' in name or 'cera' in name or 'bigote' in name: return 'Depilación'
             return 'Otros'
 
-        df_recent['Tipo'] = df_recent['Servicio'].apply(categorize_service)
+        df_recent['tipo'] = df_recent['servicio'].apply(categorize_service)
         
         # Filter only expected types
         expected = ['Corte', 'Tintura', 'Uñas', 'Depilación']
-        df_recent = df_recent[df_recent['Tipo'].isin(expected)]
+        df_recent = df_recent[df_recent['tipo'].isin(expected)]
         
         # Group by Date and Tipo
-        daily_counts = df_recent.groupby(['Fecha', 'Tipo']).size().reset_index(name='Count')
+        daily_counts = df_recent.groupby(['fecha', 'tipo']).size().reset_index(name='count')
         
         # Pivot
-        pivot_df = daily_counts.pivot(index='Fecha', columns='Tipo', values='Count').fillna(0).astype(int)
+        pivot_df = daily_counts.pivot(index='fecha', columns='tipo', values='count').fillna(0).astype(int)
         
         # Ensure all columns exist
         for col in expected:
             if col not in pivot_df.columns:
                 pivot_df[col] = 0
                 
-        # Fill missing dates in range (optional but good for charts)
-        # For simplicity, we stick to existing dates or just ensure continuity if needed.
-        # Let's reindex to ensure full 60 day range? Maybe overkill, but Chart.js handles gaps if we send labels.
-        # But for regression we need continuity or at least correct X values.
-        
         # Prepare Historical Data
         historical = []
         # Sort by date
@@ -1606,7 +1485,6 @@ def get_service_demand():
         growth_scores = {}
         
         # Create a date range for regression X to be accurate
-        # We convert dates to ordinals
         dates = pivot_df.index
         X_dates = np.array([d.toordinal() for d in dates])
         
@@ -1637,21 +1515,14 @@ def get_service_demand():
                 slope = 0
                 intercept = y[0] if len(y) > 0 else 0
                 
-            # Calculate Total Predicted Volume for next 7 days vs Last 7 days to determine "Growth"
-            # Or just use slope? Slope is rate of change per day.
             growth_scores[col] = slope
             
-            # Generate predictions
             col_preds = []
             for ordinal in next_7_ordinals:
                 val = slope * ordinal + intercept
-                col_preds.append(max(0, val)) # No negative services
-            
-            # Store temporary
-            pivot_df[f'{col}_pred'] = col_preds if False else 0 # Just placeholder explanation
+                col_preds.append(max(0, val)) 
             
             # We need to structure 'predictions' as list of dicts: [{fecha:..., Corte:..., ...}, ...]
-            # Initialize predictions list if empty
             if not predictions:
                 for d in next_7_days:
                     predictions.append({'fecha': d.strftime('%Y-%m-%d')})
@@ -1660,18 +1531,10 @@ def get_service_demand():
                 predictions[i][col] = float(val)
 
         # Determine highest growth
-        # We filter for positive growth only
-        positive_growth = {k: v for k, v in growth_scores.items() if v > 0}
-        if positive_growth:
-            growth_service = max(positive_growth, key=positive_growth.get)
+        if growth_scores:
+            growth_service = max(growth_scores, key=growth_scores.get)
         else:
-            # If all are negative or zero, maybe pick the one declining the least? Or None.
-            # User wants "resalta cuál servicio crecería más".
-            # If nothing grows, maybe none.
             growth_service = None
-            if not positive_growth and growth_scores:
-                 # Fallback: max slope even if negative (least decline)
-                 growth_service = max(growth_scores, key=growth_scores.get)
 
         return jsonify({
             'status': 'success',
@@ -1683,6 +1546,128 @@ def get_service_demand():
     except Exception as e:
         import traceback
         traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/admin/<table_name>', methods=['GET'])
+@login_required
+def admin_get_records(table_name):
+    allowed_tables = ['servicios', 'productos', 'gastos', 'inventario', 'citas', 'gastos_mensuales']
+    if table_name not in allowed_tables:
+        return jsonify({'status': 'error', 'message': 'Tabla no permitida'}), 400
+        
+    try:
+        sede = request.args.get('sede')
+        fecha = request.args.get('fecha')
+        limit = request.args.get('limit', '100')
+        offset = request.args.get('offset', '0')
+        
+        conn = get_db_connection()
+        query = f"SELECT * FROM {table_name}"
+        params = []
+        where_clauses = []
+        
+        if sede:
+            where_clauses.append("sede = ?")
+            params.append(sede)
+        if fecha:
+            where_clauses.append("date(fecha) = ?")
+            params.append(fecha)
+            
+        if where_clauses:
+            query += " WHERE " + " AND ".join(where_clauses)
+            
+        query += " ORDER BY id DESC"
+        
+        if limit:
+            query += f" LIMIT {int(limit)}"
+        if offset:
+            query += f" OFFSET {int(offset)}"
+            
+        df = pd.read_sql(query, conn, params=params)
+        conn.close()
+        
+        return jsonify({
+            'status': 'success', 
+            'data': df.to_dict(orient='records'),
+            'columns': list(df.columns)
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/admin/<table_name>/<id>', methods=['GET'])
+@login_required
+def admin_get_record(table_name, id):
+    allowed_tables = ['servicios', 'productos', 'gastos', 'inventario', 'citas', 'gastos_mensuales']
+    if table_name not in allowed_tables:
+        return jsonify({'status': 'error', 'message': 'Tabla no permitida'}), 400
+        
+    try:
+        conn = get_db_connection()
+        query = f"SELECT * FROM {table_name} WHERE id = ?"
+        df = pd.read_sql(query, conn, params=(id,))
+        conn.close()
+        
+        if df.empty:
+            return jsonify({'status': 'error', 'message': 'Registro no encontrado'}), 404
+            
+        return jsonify({'status': 'success', 'data': df.to_dict(orient='records')[0]})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/admin/<table_name>', methods=['POST'])
+@login_required
+def admin_create_record(table_name):
+    allowed_tables = ['servicios', 'productos', 'gastos', 'inventario', 'citas', 'gastos_mensuales']
+    if table_name not in allowed_tables:
+        return jsonify({'status': 'error', 'message': 'Tabla no permitida'}), 400
+        
+    try:
+        data = request.json
+        if insert_record(table_name, data):
+            return jsonify({'status': 'success', 'message': 'Registro creado'})
+        return jsonify({'status': 'error', 'message': 'Error al insertar'}), 500
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/admin/<table_name>/<id>', methods=['PUT'])
+@login_required
+def admin_update_record(table_name, id):
+    allowed_tables = ['servicios', 'productos', 'gastos', 'inventario', 'citas', 'gastos_mensuales']
+    if table_name not in allowed_tables:
+        return jsonify({'status': 'error', 'message': 'Tabla no permitida'}), 400
+        
+    try:
+        data = request.json
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        set_clause = ", ".join([f"{k} = ?" for k in data.keys()])
+        query = f"UPDATE {table_name} SET {set_clause} WHERE id = ?"
+        params = list(data.values()) + [id]
+        
+        c.execute(query, params)
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'status': 'success', 'message': 'Registro actualizado'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/admin/<table_name>/<id>', methods=['DELETE'])
+@login_required
+def admin_delete_record(table_name, id):
+    allowed_tables = ['servicios', 'productos', 'gastos', 'inventario', 'citas', 'gastos_mensuales']
+    if table_name not in allowed_tables:
+        return jsonify({'status': 'error', 'message': 'Tabla no permitida'}), 400
+        
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute(f"DELETE FROM {table_name} WHERE id = ?", (id,))
+        conn.commit()
+        conn.close()
+        return jsonify({'status': 'success', 'message': 'Registro eliminado'})
+    except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 if __name__ == '__main__':
