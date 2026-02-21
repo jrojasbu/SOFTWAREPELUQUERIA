@@ -1484,11 +1484,7 @@ def get_revenue_patterns():
         df = daily_revenue.reset_index()
         df.columns = ['Fecha', 'Valor']
         
-        # Filter last 11 months
-        today = datetime.now().date()
-        start_date = (pd.Timestamp(today) - pd.DateOffset(months=11)).date()
-        df = df[df['Fecha'] >= start_date]
-        
+        # Use all historical data (no date filter)
         if df.empty:
             return jsonify({'status': 'success', 'heatmap': [], 'patterns': {}, 'inference': 'Datos insuficientes'})
             
@@ -1517,10 +1513,10 @@ def get_revenue_patterns():
         if len(sorted_days) >= 2:
             best_day_1 = day_map[sorted_days[0][0]]
             best_day_2 = day_map[sorted_days[1][0]]
-            inference = f"Basado en los últimos 11 meses, los días con mayor probabilidad de altos ingresos son los {best_day_1} y {best_day_2}."
+            inference = f"Basado en todos los datos históricos, los días con mayor probabilidad de altos ingresos son los {best_day_1} y {best_day_2}."
         elif len(sorted_days) == 1:
             best_day = day_map[sorted_days[0][0]]
-            inference = f"Basado en los últimos 11 meses, el día con mayor probabilidad de altos ingresos es el {best_day}."
+            inference = f"Basado en todos los datos históricos, el día con mayor probabilidad de altos ingresos es el {best_day}."
         else:
             inference = "No hay suficientes datos para generar una inferencia."
             

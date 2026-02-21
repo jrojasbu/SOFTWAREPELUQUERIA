@@ -951,22 +951,25 @@ def get_statistics():
         # Convertir el diccionario a lista
         inventario_resumido = list(inventario_agrupado.values())
             
-        # Yearly Sales Timeline
+        # Yearly Sales Timeline - Last 3 Years
         meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
                  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
-        ventas_anuales = []
+        timeline_data = {}
         
-        for m in range(1, 13):
-            try:
-                s_month = servicios_df[(servicios_df['fecha'].dt.year == int(year)) & 
-                                       (servicios_df['fecha'].dt.month == m)]
-                p_month = productos_df[(productos_df['fecha'].dt.year == int(year)) & 
-                                       (productos_df['fecha'].dt.month == m)]
-                total = s_month['valor'].sum() + p_month['valor'].sum()
-                ventas_anuales.append(float(total))
-            except:
-                 ventas_anuales.append(0.0)
-            
+        for y in range(int(year) - 2, int(year) + 1):
+            ventas_anuales = []
+            for m in range(1, 13):
+                try:
+                    s_month = servicios_df[(servicios_df['fecha'].dt.year == y) & 
+                                           (servicios_df['fecha'].dt.month == m)]
+                    p_month = productos_df[(productos_df['fecha'].dt.year == y) & 
+                                           (productos_df['fecha'].dt.month == m)]
+                    total = s_month['valor'].sum() + p_month['valor'].sum()
+                    ventas_anuales.append(float(total))
+                except:
+                    ventas_anuales.append(0.0)
+            timeline_data[str(y)] = ventas_anuales
+        
         # Top Servicios (Frecuencia)
         top_servicios = servicios_month['servicio'].value_counts().head(10).to_dict()
         
@@ -1005,10 +1008,7 @@ def get_statistics():
                 'top_servicios': top_servicios,
                 'estado_inventario': estado_inventario,
                 'inventario': inventario_resumido,
-                'timeline': {
-                    'labels': meses,
-                    'data': ventas_anuales
-                }
+                'timeline': timeline_data
             }
         })
         
@@ -1266,10 +1266,10 @@ def get_prediction():
         income_df = daily_income.reset_index()
         income_df.columns = ['fecha', 'valor']
         
-        # Get last 60 days of data
+        # Get last 11 months of data (approximately 330 days)
         today = datetime.now().date()
-        sixty_days_ago = today - pd.Timedelta(days=60)
-        income_df = income_df[income_df['fecha'] >= sixty_days_ago]
+        eleven_months_ago = today - pd.Timedelta(days=330)
+        income_df = income_df[income_df['fecha'] >= eleven_months_ago]
         
         if income_df.empty:
             return jsonify({'status': 'success', 'historical': [], 'prediction': []})
@@ -1364,11 +1364,7 @@ def get_revenue_patterns():
         df = daily_revenue.reset_index()
         df.columns = ['fecha', 'valor']
         
-        # Filter last 60 days
-        today = datetime.now().date()
-        sixty_days_ago = today - pd.Timedelta(days=60)
-        df = df[df['fecha'] >= sixty_days_ago]
-        
+        # Use all historical data (no date filter)
         if df.empty:
             return jsonify({'status': 'success', 'heatmap': [], 'patterns': {}, 'inference': 'Datos insuficientes'})
             
@@ -1396,10 +1392,10 @@ def get_revenue_patterns():
         if len(sorted_days) >= 2:
             best_day_1 = day_map[sorted_days[0][0]]
             best_day_2 = day_map[sorted_days[1][0]]
-            inference = f"Basado en los últimos 2 meses, los días con mayor probabilidad de altos ingresos son los {best_day_1} y {best_day_2}."
+            inference = f"Basado en todos los datos históricos, los días con mayor probabilidad de altos ingresos son los {best_day_1} y {best_day_2}."
         elif len(sorted_days) == 1:
             best_day = day_map[sorted_days[0][0]]
-            inference = f"Basado en los últimos 2 meses, el día con mayor probabilidad de altos ingresos es el {best_day}."
+            inference = f"Basado en todos los datos históricos, el día con mayor probabilidad de altos ingresos es el {best_day}."
         else:
             inference = "No hay suficientes datos para generar una inferencia."
             

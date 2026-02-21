@@ -456,11 +456,11 @@
 
                 <div class="charts-container"
                     style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2rem; margin-bottom: 2rem;">
-                    <div class="chart-wrapper" style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 12px;">
+                    <div class="chart-wrapper">
                         <h3 style="text-align: center; margin-bottom: 1rem;">Distribución de Nómina</h3>
                         <canvas id="payrollChart"></canvas>
                     </div>
-                    <div class="chart-wrapper" style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 12px;">
+                    <div class="chart-wrapper">
                         <h3 style="text-align: center; margin-bottom: 1rem;">Ventas por Estilista</h3>
                         <canvas id="salesChart"></canvas>
                     </div>
@@ -468,25 +468,22 @@
 
                 <div class="charts-container"
                     style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2rem; margin-bottom: 2rem;">
-                    <div class="chart-wrapper"
-                        style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 12px; width: 100%;">
+                    <div class="chart-wrapper" style="width: 100%;">
                         <h3 style="text-align: center; margin-bottom: 1rem;">Top Servicios Realizados</h3>
                         <canvas id="servicesChart"></canvas>
                     </div>
                 </div>
 
-                <div class="chart-wrapper"
-                    style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 12px; margin-bottom: 2rem;">
-                    <h3 style="text-align: center; margin-bottom: 1rem;">Histórico de Ventas Mensuales (Año Actual)</h3>
+                <div class="chart-wrapper" style="margin-bottom: 2rem;">
+                    <h3 style="text-align: center; margin-bottom: 1rem;">Histórico de Ventas Mensuales (Últimos 3 Años)</h3>
                     <canvas id="timelineChart"></canvas>
                 </div>
 
-                <div class="chart-wrapper"
-                    style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 12px; margin-bottom: 2rem; border-left: 4px solid #d4af37;">
+                <div class="chart-wrapper" style="margin-bottom: 2rem; border-left: 4px solid #d4af37;">
                     <h3 style="text-align: center; margin-bottom: 0.5rem;">🔮 Predicción de Ingresos (Próximos 7 Días)
                     </h3>
                     <p style="text-align: center; color: #94a3b8; font-size: 0.85rem; margin-bottom: 1.5rem;">Basado en
-                        los últimos 60 días de actividad</p>
+                        los últimos 11 meses de actividad</p>
                     <canvas id="predictionChart"></canvas>
                     <div id="predictionSummary"
                         style="margin-top: 1rem; color: #cbd5e1; font-size: 0.9rem; background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 8px; display: none;">
@@ -494,8 +491,7 @@
                     </div>
                 </div>
 
-                <div class="chart-wrapper"
-                    style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 12px; margin-bottom: 2rem; border-left: 4px solid #10b981;">
+                <div class="chart-wrapper" style="margin-bottom: 2rem; border-left: 4px solid #10b981;">
                     <h3 style="text-align: center; margin-bottom: 0.5rem;">💸 Mapa de Calor de Ingresos (Semanal)</h3>
                     <p style="text-align: center; color: #94a3b8; font-size: 0.85rem; margin-bottom: 1.5rem;">
                         Análisis de volumen de ventas por día de la semana
@@ -510,8 +506,7 @@
                     </div>
                 </div>
 
-                <div class="chart-wrapper"
-                    style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 12px; margin-bottom: 2rem; border-left: 4px solid #3b82f6;">
+                <div class="chart-wrapper" style="margin-bottom: 2rem; border-left: 4px solid #3b82f6;">
                     <h3 style="text-align: center; margin-bottom: 0.5rem;">📈 Demanda de Servicios (Predictivo)</h3>
                     <p style="text-align: center; color: #94a3b8; font-size: 0.85rem; margin-bottom: 1.5rem;">
                         Histórico 60 días + Predicción 7 días

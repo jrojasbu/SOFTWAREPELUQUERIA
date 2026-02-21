@@ -558,9 +558,9 @@ async function loadStatistics() {
                 options: {
                     responsive: true,
                     plugins: {
-                        legend: { position: 'bottom', labels: { color: '#cbd5e1' } },
+                        legend: { position: 'bottom', labels: { color: '#0f172a' } },
                         datalabels: {
-                            color: '#fff',
+                            color: '#0f172a',
                             display: function (context) {
                                 return context.dataset.data[context.dataIndex] > 0;
                             },
@@ -588,13 +588,26 @@ async function loadStatistics() {
                 type: 'bar',
                 data: {
                     labels: salesLabels,
-                    datasets: [{
-                        label: 'Ventas por Estilista',
-                        data: salesData,
-                        backgroundColor: '#63ecf1',
-                        borderColor: '#63ecf1',
-                        borderWidth: 1
-                    }]
+                    datasets: [
+                        {
+                            label: 'Ventas por Estilista',
+                            data: salesData,
+                            backgroundColor: 'rgba(99, 236, 241, 0.8)',
+                            borderColor: '#00b8c4',
+                            borderWidth: 1,
+                            borderRadius: 6,
+                            borderSkipped: false,
+                        },
+                        {
+                            label: 'Sombra',
+                            data: salesData.map(v => v * 0.15),
+                            backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                            borderColor: 'transparent',
+                            borderWidth: 0,
+                            borderRadius: 6,
+                            borderSkipped: false,
+                        }
+                    ]
                 },
                 options: {
                     responsive: true,
@@ -604,37 +617,45 @@ async function loadStatistics() {
                         }
                     },
                     scales: {
-                        y: { beginAtZero: true, ticks: { color: '#cbd5e1' }, grid: { color: 'rgba(255, 255, 255, 0.1)' } },
-                        x: { ticks: { color: '#cbd5e1' }, grid: { display: false } }
+                        y: { beginAtZero: true, ticks: { color: '#0f172a' }, grid: { color: 'rgba(0, 0, 0, 0.1)' } },
+                        x: { ticks: { color: '#0f172a' }, grid: { display: false } }
                     },
                     plugins: {
                         legend: { display: false },
                         datalabels: {
-                            color: '#cbd5e1',
+                            color: '#0f172a',
                             anchor: 'end',
                             align: 'top',
-                            formatter: (value) => '$' + value.toLocaleString()
+                            formatter: (value) => '$' + value.toLocaleString(),
+                            display: function(context) {
+                                return context.datasetIndex === 0;
+                            }
                         }
                     }
                 }
             });
 
-            // 3. Timeline Line Chart
+            // 3. Timeline Line Chart - Last 3 Years
             const timelineCtx = document.getElementById('timelineChart').getContext('2d');
             if (timelineChart) timelineChart.destroy();
+
+            const years = Object.keys(data.timeline).sort();
+            const colors = ['#325ff3', '#10b981', '#ec4899']; // Blue, Green, Pink
+            const datasets = years.map((year, index) => ({
+                label: year,
+                data: data.timeline[year],
+                borderColor: colors[index % colors.length],
+                backgroundColor: colors[index % colors.length].replace(')', ', 0.2)').replace('rgb', 'rgba'),
+                fill: false,
+                tension: 0.4
+            }));
 
             timelineChart = new Chart(timelineCtx, {
                 type: 'line',
                 data: {
-                    labels: data.timeline.labels,
-                    datasets: [{
-                        label: 'Ventas Mensuales',
-                        data: data.timeline.data,
-                        borderColor: '#325ff3',
-                        backgroundColor: 'rgba(50, 95, 243, 0.2)',
-                        fill: true,
-                        tension: 0.4
-                    }]
+                    labels: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                             'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
+                    datasets: datasets
                 },
                 options: {
                     responsive: true,
@@ -644,13 +665,13 @@ async function loadStatistics() {
                         }
                     },
                     scales: {
-                        y: { beginAtZero: true, ticks: { color: '#cbd5e1' }, grid: { color: 'rgba(255, 255, 255, 0.1)' } },
-                        x: { ticks: { color: '#cbd5e1' }, grid: { color: 'rgba(255, 255, 255, 0.05)' } }
+                        y: { beginAtZero: true, ticks: { color: '#0f172a' }, grid: { color: 'rgba(0, 0, 0, 0.1)' } },
+                        x: { ticks: { color: '#0f172a' }, grid: { color: 'rgba(0, 0, 0, 0.05)' } }
                     },
                     plugins: {
-                        legend: { labels: { color: '#cbd5e1' } },
+                        legend: { labels: { color: '#0f172a' } },
                         datalabels: {
-                            color: '#cbd5e1',
+                            color: '#0f172a',
                             align: 'top',
                             formatter: (value) => '$' + value.toLocaleString()
                         }
@@ -674,13 +695,26 @@ async function loadStatistics() {
                     indexAxis: 'y',
                     data: {
                         labels: servicesLabels,
-                        datasets: [{
-                            label: 'Cantidad de Servicios',
-                            data: servicesData,
-                            backgroundColor: '#ec4899',
-                            borderColor: '#ec4899',
-                            borderWidth: 1
-                        }]
+                        datasets: [
+                            {
+                                label: 'Cantidad de Servicios',
+                                data: servicesData,
+                                backgroundColor: 'rgba(236, 72, 153, 0.8)',
+                                borderColor: '#be185d',
+                                borderWidth: 1,
+                                borderRadius: 6,
+                                borderSkipped: false,
+                            },
+                            {
+                                label: 'Sombra',
+                                data: servicesData.map(v => v * 0.15),
+                                backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                                borderColor: 'transparent',
+                                borderWidth: 0,
+                                borderRadius: 6,
+                                borderSkipped: false,
+                            }
+                        ]
                     },
                     options: {
                         responsive: true,
@@ -690,13 +724,13 @@ async function loadStatistics() {
                             }
                         },
                         scales: {
-                            x: { beginAtZero: true, ticks: { color: '#cbd5e1' }, grid: { color: 'rgba(255, 255, 255, 0.1)' } },
-                            y: { ticks: { color: '#cbd5e1' }, grid: { display: false } }
+                            x: { beginAtZero: true, ticks: { color: '#0f172a' }, grid: { color: 'rgba(0, 0, 0, 0.1)' } },
+                            y: { ticks: { color: '#0f172a' }, grid: { display: false } }
                         },
                         plugins: {
                             legend: { display: false },
                             datalabels: {
-                                color: '#cbd5e1',
+                                color: '#0f172a',
                                 anchor: 'end',
                                 align: 'right'
                             }
@@ -825,14 +859,14 @@ async function loadPredictionChart() {
                         y: {
                             beginAtZero: true,
                             ticks: {
-                                color: '#94a3b8',
+                                color: '#0f172a',
                                 callback: (value) => '$' + value.toLocaleString()
                             },
-                            grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                            grid: { color: 'rgba(0, 0, 0, 0.05)' }
                         },
                         x: {
                             ticks: {
-                                color: '#94a3b8',
+                                color: '#0f172a',
                                 maxRotation: 45,
                                 minRotation: 45,
                                 autoSkip: true,
@@ -843,7 +877,7 @@ async function loadPredictionChart() {
                     },
                     plugins: {
                         legend: {
-                            labels: { color: '#cbd5e1', usePointStyle: true }
+                            labels: { color: '#0f172a', usePointStyle: true }
                         },
                         tooltip: {
                             callbacks: {
@@ -953,16 +987,30 @@ async function loadRevenueHeatmap() {
                 type: 'bar',
                 data: {
                     labels: days,
-                    datasets: [{
-                        label: 'Ingreso Promedio Semanal',
-                        data: dataValues,
-                        backgroundColor: colors,
-                        borderColor: '#10b981',
-                        borderWidth: 1,
-                        borderRadius: 6,
-                        barPercentage: 0.9,
-                        categoryPercentage: 0.9
-                    }]
+                    datasets: [
+                        {
+                            label: 'Ingreso Promedio Semanal',
+                            data: dataValues,
+                            backgroundColor: colors,
+                            borderColor: '#059669',
+                            borderWidth: 1,
+                            borderRadius: 6,
+                            borderSkipped: false,
+                            barPercentage: 0.9,
+                            categoryPercentage: 0.9
+                        },
+                        {
+                            label: 'Sombra',
+                            data: dataValues.map(v => v * 0.15),
+                            backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                            borderColor: 'transparent',
+                            borderWidth: 0,
+                            borderRadius: 6,
+                            borderSkipped: false,
+                            barPercentage: 0.9,
+                            categoryPercentage: 0.9
+                        }
+                    ]
                 },
                 options: {
                     responsive: true,
@@ -971,13 +1019,13 @@ async function loadRevenueHeatmap() {
                         y: {
                             beginAtZero: true,
                             ticks: {
-                                color: '#94a3b8',
+                                color: '#0f172a',
                                 callback: (value) => '$' + value.toLocaleString()
                             },
-                            grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                            grid: { color: 'rgba(0, 0, 0, 0.05)' }
                         },
                         x: {
-                            ticks: { color: '#94a3b8' },
+                            ticks: { color: '#0f172a' },
                             grid: { display: false }
                         }
                     },
@@ -989,7 +1037,7 @@ async function loadRevenueHeatmap() {
                             }
                         },
                         datalabels: {
-                            color: '#fff',
+                            color: '#0f172a',
                             anchor: 'end',
                             align: 'top',
                             formatter: (val) => {
@@ -1104,18 +1152,18 @@ async function loadServiceDemand() {
                     scales: {
                         x: {
                             stacked: true,
-                            ticks: { color: '#94a3b8', maxTicksLimit: 15 },
+                            ticks: { color: '#0f172a', maxTicksLimit: 15 },
                             grid: { display: false }
                         },
                         y: {
                             stacked: true,
                             beginAtZero: true,
-                            ticks: { color: '#94a3b8', stepSize: 1 },
-                            grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                            ticks: { color: '#0f172a', stepSize: 1 },
+                            grid: { color: 'rgba(0, 0, 0, 0.05)' }
                         }
                     },
                     plugins: {
-                        legend: { labels: { color: '#cbd5e1' } },
+                        legend: { labels: { color: '#0f172a' } },
                         tooltip: {
                             callbacks: {
                                 title: (context) => {
