@@ -704,7 +704,7 @@
                 options: {
                     sede: {{ sedes | tojson }},
                     estilista: {{ stylists | tojson }},
-                    metodo_pago: ['Efectivo', 'Transferencia', 'Tarjeta', 'Otro']
+                    metodo_pago: ['Efectivo', 'Tarjeta', 'NEQUI', 'Daviplata']
                 }
             },
             productos: {
@@ -736,7 +736,7 @@
                 options: {
                     sede: {{ sedes | tojson }},
                     estilista: {{ stylists | tojson }},
-                    metodo_pago: ['Efectivo', 'Transferencia', 'Tarjeta', 'Otro']
+                    metodo_pago: ['Efectivo', 'Tarjeta', 'NEQUI', 'Daviplata']
                 }
             },
             gastos: {
@@ -911,7 +911,14 @@
             url += `offset=${currentOffset}`;
 
             try {
-                const response = await fetch(url);
+                const response = await fetch(url, {
+                    credentials: 'same-origin'
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
                 const result = await response.json();
 
                 if (result.status === 'success') {
@@ -919,10 +926,11 @@
                     renderTable(result.columns);
                 } else {
                     showToast(result.message || 'Error al cargar datos', 'error');
+                    console.error('API Error:', result.message);
                 }
             } catch (error) {
-                showToast('Error de conexión', 'error');
-                console.error(error);
+                showToast(`Error de conexión: ${error.message}`, 'error');
+                console.error('Fetch error:', error);
             }
         }
 
@@ -986,7 +994,14 @@
 
         async function openEditModal(id) {
             try {
-                const response = await fetch(`/api/admin/${currentTable}/${id}`);
+                const response = await fetch(`/api/admin/${currentTable}/${id}`, {
+                    credentials: 'same-origin'
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
                 const result = await response.json();
 
                 if (result.status === 'success') {
@@ -998,7 +1013,8 @@
                     showToast(result.message || 'Error al cargar registro', 'error');
                 }
             } catch (error) {
-                showToast('Error de conexión', 'error');
+                showToast(`Error al cargar: ${error.message}`, 'error');
+                console.error('Error:', error);
             }
         }
 
@@ -1062,8 +1078,14 @@
                 const response = await fetch(url, {
                     method: method,
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
                     body: JSON.stringify(data)
                 });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
                 const result = await response.json();
 
                 if (result.status === 'success') {
@@ -1074,7 +1096,8 @@
                     showToast(result.message || 'Error al guardar', 'error');
                 }
             } catch (error) {
-                showToast('Error de conexión', 'error');
+                showToast(`Error al guardar: ${error.message}`, 'error');
+                console.error('Save error:', error);
             }
         }
 
@@ -1093,8 +1116,14 @@
 
             try {
                 const response = await fetch(`/api/admin/${currentTable}/${id}`, {
-                    method: 'DELETE'
+                    method: 'DELETE',
+                    credentials: 'same-origin'
                 });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
                 const result = await response.json();
 
                 if (result.status === 'success') {
@@ -1105,7 +1134,8 @@
                     showToast(result.message || 'Error al eliminar', 'error');
                 }
             } catch (error) {
-                showToast('Error de conexión', 'error');
+                showToast(`Error al eliminar: ${error.message}`, 'error');
+                console.error('Delete error:', error);
             }
         }
 
@@ -1118,11 +1148,15 @@
             const toast = document.createElement('div');
             toast.className = `toast ${type}`;
             toast.textContent = message;
+            toast.style.maxWidth = '400px';
+            toast.style.wordWrap = 'break-word';
             container.appendChild(toast);
 
+            // Show longer for errors
+            const duration = type === 'error' ? 5000 : 3000;
             setTimeout(() => {
                 toast.remove();
-            }, 3000);
+            }, duration);
         }
     </script>
 </body>

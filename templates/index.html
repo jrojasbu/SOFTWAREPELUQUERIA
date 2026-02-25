@@ -41,6 +41,23 @@
         <button class="tab-btn" onclick="openTab('config')">Configuración</button>
 
         <div class="sidebar-footer">
+            <!-- Toggle Modo Oscuro -->
+            <div class="darkmode-toggle-wrap">
+                <button class="darkmode-btn" id="darkmodeBtn" onclick="toggleDarkMode()">
+                    <span class="dm-icon" id="dmIcon">🌙</span>
+                    <span id="dmLabel">Modo Oscuro</span>
+                </button>
+            </div>
+            <!-- Toggle Apariencia Contenedor -->
+            <div class="appearance-toggle-wrap">
+                <span class="appearance-toggle-label">🎨 Apariencia</span>
+                <div class="appearance-toggle" id="appearanceToggle" onclick="toggleContainerStyle()"
+                    title="Cambiar entre traslúcido y sólido">
+                    <div class="toggle-option" id="toggleOptGlass">🔮 Glass</div>
+                    <div class="toggle-option active" id="toggleOptSolid">⬜ Sólido</div>
+                    <div class="toggle-slider"></div>
+                </div>
+            </div>
             <a href="/admin" class="sidebar-btn admin">⚙️ Administración</a>
             <a href="/logout" class="sidebar-btn logout">🚪 Cerrar Sesión</a>
         </div>
@@ -50,7 +67,7 @@
         <header>
             <div
                 style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">
-                Magical Hair Premium v3.4.2 &copy; 2026</div>
+                Magical Hair Premium v4.0 &copy; 2026</div>
             <h1>Gestión Peluquería Magical Hair</h1>
             <p>Panel de Control Diario</p>
         </header>
@@ -475,7 +492,8 @@
                 </div>
 
                 <div class="chart-wrapper" style="margin-bottom: 2rem;">
-                    <h3 style="text-align: center; margin-bottom: 1rem;">Histórico de Ventas Mensuales (Últimos 3 Años)</h3>
+                    <h3 style="text-align: center; margin-bottom: 1rem;">Histórico de Ventas Mensuales (Últimos 3 Años)
+                    </h3>
                     <canvas id="timelineChart"></canvas>
                 </div>
 
@@ -551,6 +569,19 @@
                 </div>
 
                 <h3 style="margin-top: 2rem;">Inventario Resumido</h3>
+
+                <!-- Gráfico de barras: Cantidad por Producto -->
+                <div class="chart-wrapper"
+                    style="margin-top: 1rem; margin-bottom: 2rem; border-left: 4px solid #8b5cf6;">
+                    <h3 style="text-align: center; margin-bottom: 0.5rem;">📦 Stock por Producto (Cantidad)</h3>
+                    <p style="text-align: center; color: #94a3b8; font-size: 0.85rem; margin-bottom: 1.5rem;">
+                        Comparativa de unidades disponibles en inventario
+                    </p>
+                    <div style="min-height: 300px;">
+                        <canvas id="inventoryBarChart"></canvas>
+                    </div>
+                </div>
+
                 <div class="table-container">
                     <table class="summary-table">
                         <thead>
@@ -578,17 +609,24 @@
                         <div class="input-group">
                             <input type="text" name="name" placeholder="Nombre del nuevo estilista" required>
                         </div>
-                        <button type="submit" class="submit-btn">Agregar</button>
+                        <div class="input-group" style="display: flex; gap: 10px; margin-top: 10px;">
+                            <div style="flex: 1;">
+                                <label style="font-size: 0.85rem; color: #666;">Comisión %</label>
+                                <input type="number" name="commission" value="50" min="0" max="100" step="1"
+                                    style="width: 100%;">
+                            </div>
+                            <div style="flex: 1;">
+                                <label style="font-size: 0.85rem; color: #666;">Comisión Especial %</label>
+                                <input type="number" name="special_commission" value="50" min="0" max="100" step="1"
+                                    style="width: 100%;">
+                            </div>
+                        </div>
+                        <button type="submit" class="submit-btn" style="margin-top: 10px;">Agregar</button>
                     </form>
 
                     <h3 style="margin-top: 2rem;">Lista de Estilistas</h3>
-                    <ul class="stylist-list">
-                        {% for stylist in stylists %}
-                        <li class="stylist-item">
-                            <span>{{ stylist }}</span>
-                            <button class="delete-btn" onclick="deleteStylist('{{ stylist }}')">Eliminar</button>
-                        </li>
-                        {% endfor %}
+                    <ul class="stylist-list" id="stylistsList">
+                        <!-- Populated by JS -->
                     </ul>
 
                     <hr style="margin: 2rem 0; border: 0; border-top: 1px solid #e5e7eb;">
@@ -605,13 +643,8 @@
                     </form>
 
                     <h3 style="margin-top: 2rem;">Lista de Servicios</h3>
-                    <ul class="stylist-list">
-                        {% for service in services %}
-                        <li class="stylist-item">
-                            <span>{{ service.name }} - ${{ service.value | round | int }}</span>
-                            <button class="delete-btn" onclick="deleteService('{{ service.name }}')">Eliminar</button>
-                        </li>
-                        {% endfor %}
+                    <ul class="stylist-list" id="servicesList">
+                        <!-- Populated by JS -->
                     </ul>
 
                     <hr style="margin: 2rem 0; border: 0; border-top: 1px solid #e5e7eb;">
@@ -674,6 +707,76 @@
 
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script>
+        // =============================================
+        // Toggle MODO OSCURO
+        // =============================================
+        const DARK_MODE_KEY = 'darkMode';
+
+        function applyDarkMode(enabled) {
+            const btn = document.getElementById('darkmodeBtn');
+            const icon = document.getElementById('dmIcon');
+            const label = document.getElementById('dmLabel');
+            if (enabled) {
+                document.body.classList.add('dark-mode');
+                icon.textContent = '☀️';
+                label.textContent = 'Modo Claro';
+            } else {
+                document.body.classList.remove('dark-mode');
+                icon.textContent = '🌙';
+                label.textContent = 'Modo Oscuro';
+            }
+        }
+
+        function toggleDarkMode() {
+            const isDark = document.body.classList.contains('dark-mode');
+            const newState = !isDark;
+            localStorage.setItem(DARK_MODE_KEY, newState ? '1' : '0');
+            applyDarkMode(newState);
+        }
+
+        // =============================================
+        // Toggle APARIENCIA CONTENEDOR (glass / sólido)
+        // =============================================
+        const CONTAINER_STYLE_KEY = 'containerStyle';
+
+        function applyContainerStyle(style) {
+            const container = document.querySelector('.container');
+            const toggleGlass = document.getElementById('toggleOptGlass');
+            const toggleSolid = document.getElementById('toggleOptSolid');
+
+            if (style === 'glass') {
+                container.classList.remove('container-solid');
+                container.classList.add('container-glass');
+                toggleGlass.classList.add('active');
+                toggleSolid.classList.remove('active');
+            } else {
+                container.classList.remove('container-glass');
+                container.classList.add('container-solid');
+                toggleSolid.classList.add('active');
+                toggleGlass.classList.remove('active');
+            }
+        }
+
+        function toggleContainerStyle() {
+            const container = document.querySelector('.container');
+            const isSolid = container.classList.contains('container-solid');
+            const newStyle = isSolid ? 'glass' : 'solid';
+            localStorage.setItem(CONTAINER_STYLE_KEY, newStyle);
+            applyContainerStyle(newStyle);
+        }
+
+        // =============================================
+        // Aplicar preferencias al cargar la página
+        // =============================================
+        (function () {
+            const savedDark = localStorage.getItem(DARK_MODE_KEY);
+            applyDarkMode(savedDark === '1');
+
+            const savedStyle = localStorage.getItem(CONTAINER_STYLE_KEY) || 'solid';
+            applyContainerStyle(savedStyle);
+        })();
+    </script>
 </body>
 
 </html>

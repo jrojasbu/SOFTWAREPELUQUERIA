@@ -26,6 +26,8 @@ function openTab(tabName) {
         loadAppointments();
     } else if (tabName === 'config') {
         loadUsers();
+        loadStylistsList();
+        loadServicesList();
     } else if (tabName === 'monthly-expenses') {
         loadMonthlyExpenses();
     }
@@ -69,6 +71,7 @@ let servicesChart;
 let predictionChart;
 let revenueHeatmapChart;
 let serviceDemandChart;
+let inventoryBarChart;
 
 async function loadSummary() {
     try {
@@ -315,7 +318,14 @@ async function handleStylistSubmit(event, url) {
         if (result.status === 'success') {
             showNotification(result.message);
             form.reset();
-            setTimeout(() => location.reload(), 1000); // Reload to update lists
+            // Reload appropriate list based on submission type
+            if (url === '/api/stylist') {
+                loadStylistsList();
+            } else if (url === '/api/service-item') {
+                loadServicesList();
+            } else {
+                setTimeout(() => location.reload(), 1000);
+            }
         } else {
             showNotification(result.message, true);
         }
@@ -344,13 +354,85 @@ async function deleteStylist(name) {
 
         if (result.status === 'success') {
             showNotification(result.message);
-            setTimeout(() => location.reload(), 1000);
+            loadStylistsList();
         } else {
             showNotification(result.message, true);
         }
     } catch (error) {
         console.error('Error:', error);
         showNotification('Error de conexión', true);
+    }
+}
+
+async function updateStylistCommission(name, commission, specialCommission) {
+    try {
+        const response = await fetch('/api/stylist', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                name: name,
+                commission: commission,
+                special_commission: specialCommission
+            }),
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            showNotification('Comisión actualizada');
+        } else {
+            showNotification(result.message, true);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showNotification('Error de conexión', true);
+    }
+}
+
+async function loadStylistsList() {
+    try {
+        const response = await fetch('/api/stylists');
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            const list = document.getElementById('stylistsList');
+            if (!list) return;
+
+            list.innerHTML = '';
+            result.data.forEach(stylist => {
+                const li = document.createElement('li');
+                li.className = 'stylist-item';
+                li.innerHTML = `
+                    <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <strong style="font-size: 1.1rem;">${stylist.name}</strong>
+                            <button class="delete-btn" onclick="deleteStylist('${stylist.name}')">Eliminar</button>
+                        </div>
+                        <div style="display: flex; gap: 15px; align-items: center;">
+                            <div style="display: flex; align-items: center; gap: 5px;">
+                                <label style="font-size: 0.85rem; color: #666;">Comisión:</label>
+                                <input type="number" value="${stylist.commission}" min="0" max="100" step="1" 
+                                    style="width: 70px; padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px;"
+                                    onchange="updateStylistCommission('${stylist.name}', this.value, ${stylist.special_commission})">
+                                <span style="font-size: 0.85rem;">%</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 5px;">
+                                <label style="font-size: 0.85rem; color: #666;">Especial:</label>
+                                <input type="number" value="${stylist.special_commission}" min="0" max="100" step="1" 
+                                    style="width: 70px; padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px;"
+                                    onchange="updateStylistCommission('${stylist.name}', ${stylist.commission}, this.value)">
+                                <span style="font-size: 0.85rem;">%</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                list.appendChild(li);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading stylists:', error);
     }
 }
 
@@ -370,13 +452,72 @@ async function deleteService(name) {
 
         if (result.status === 'success') {
             showNotification(result.message);
-            setTimeout(() => location.reload(), 1000);
+            loadServicesList();
         } else {
             showNotification(result.message, true);
         }
     } catch (error) {
         console.error('Error:', error);
         showNotification('Error de conexión', true);
+    }
+}
+
+async function updateServiceValue(name, value) {
+    try {
+        const response = await fetch('/api/service-item', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ name: name, value: value }),
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            showNotification('Valor del servicio actualizado');
+        } else {
+            showNotification(result.message, true);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showNotification('Error de conexión', true);
+    }
+}
+
+async function loadServicesList() {
+    try {
+        const response = await fetch('/api/services');
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            const list = document.getElementById('servicesList');
+            if (!list) return;
+
+            list.innerHTML = '';
+            result.data.forEach(service => {
+                const li = document.createElement('li');
+                li.className = 'stylist-item';
+                li.innerHTML = `
+                    <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <strong style="font-size: 1.1rem;">${service.name}</strong>
+                            <button class="delete-btn" onclick="deleteService('${service.name}')">Eliminar</button>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <label style="font-size: 0.85rem; color: #666;">Valor:</label>
+                            <input type="number" value="${service.value || 0}" min="0" step="100"
+                                style="width: 120px; padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px;"
+                                onchange="updateServiceValue('${service.name}', this.value)">
+                            <span style="font-size: 0.85rem;">$</span>
+                        </div>
+                    </div>
+                `;
+                list.appendChild(li);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading services:', error);
     }
 }
 
@@ -399,22 +540,22 @@ async function loadInventory() {
                 // Add to table
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${item.Producto}</td>
-                    <td>${item.Marca || ''}</td>
-                    <td>${item.Descripcion || ''}</td>
-                    <td>${item.Cantidad}</td>
-                    <td>${item.Unidad}</td>
-                    <td>$${item.Valor.toLocaleString()}</td>
-                    <td>${item.Estado || 'Nuevo'}</td>
+                    <td>${item.producto || ''}</td>
+                    <td>${item.marca || ''}</td>
+                    <td>${item.descripcion || ''}</td>
+                    <td>${item.cantidad || 0}</td>
+                    <td>${item.unidad || ''}</td>
+                    <td>$${(item.valor || 0).toLocaleString()}</td>
+                    <td>${item.estado || 'Nuevo'}</td>
                     <td>
-                        <button class="delete-btn" onclick="deleteInventoryItem('${item.Producto}', '${item.Marca || ''}', '${item.Descripcion || ''}')">Eliminar</button>
+                        <button class="delete-btn" onclick="deleteInventoryItem('${item.producto || ''}', '${item.marca || ''}', '${item.descripcion || ''}')">Eliminar</button>
                     </td>
                 `;
                 tbody.appendChild(row);
 
                 // Add to datalist
                 const option = document.createElement('option');
-                option.value = item.Producto;
+                option.value = item.producto || '';
                 datalist.appendChild(option);
             });
         } else {
@@ -627,7 +768,7 @@ async function loadStatistics() {
                             anchor: 'end',
                             align: 'top',
                             formatter: (value) => '$' + value.toLocaleString(),
-                            display: function(context) {
+                            display: function (context) {
                                 return context.datasetIndex === 0;
                             }
                         }
@@ -653,8 +794,8 @@ async function loadStatistics() {
             timelineChart = new Chart(timelineCtx, {
                 type: 'line',
                 data: {
-                    labels: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
-                             'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
+                    labels: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
                     datasets: datasets
                 },
                 options: {
@@ -772,6 +913,91 @@ async function loadStatistics() {
                 `;
                 inventoryBody.appendChild(row);
             });
+
+            // 5. Inventory Bar Chart - Stock por Producto
+            const invBarCanvas = document.getElementById('inventoryBarChart');
+            if (invBarCanvas && data.inventario && data.inventario.length > 0) {
+                const invCtx = invBarCanvas.getContext('2d');
+                if (inventoryBarChart) inventoryBarChart.destroy();
+
+                // Ordenar por cantidad descendente y tomar top 20
+                const invSorted = [...data.inventario]
+                    .sort((a, b) => b.cantidad - a.cantidad)
+                    .slice(0, 20);
+
+                const invLabels = invSorted.map(i => i.producto);
+                const invCantidades = invSorted.map(i => i.cantidad);
+
+                // Paleta degradada de morado a cyan
+                const palette = [
+                    '#8b5cf6', '#7c3aed', '#6d28d9', '#a855f7',
+                    '#c084fc', '#00e1e9', '#0c58fc', '#38bdf8',
+                    '#10b981', '#34d399', '#f59e0b', '#fbbf24',
+                    '#ec4899', '#f472b6', '#ef4444', '#f87171',
+                    '#8b5cf6', '#6366f1', '#00b8c4', '#64748b'
+                ];
+                const bgColors = invCantidades.map((_, i) =>
+                    palette[i % palette.length] + 'cc'
+                );
+                const borderColors = invCantidades.map((_, i) =>
+                    palette[i % palette.length]
+                );
+
+                const isDark = document.body.classList.contains('dark-mode');
+                const tickColor = isDark ? '#94a3b8' : '#1e3a5f';
+                const gridColor = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.08)';
+                const labelColor = isDark ? '#e2e8f0' : '#0f172a';
+
+                inventoryBarChart = new Chart(invCtx, {
+                    type: 'bar',
+                    indexAxis: 'y',
+                    data: {
+                        labels: invLabels,
+                        datasets: [{
+                            label: 'Cantidad en Stock',
+                            data: invCantidades,
+                            backgroundColor: bgColors,
+                            borderColor: borderColors,
+                            borderWidth: 1.5,
+                            borderRadius: 6,
+                            borderSkipped: false,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        layout: { padding: { right: 50 } },
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                ticks: { color: tickColor, stepSize: 1 },
+                                grid: { color: gridColor }
+                            },
+                            y: {
+                                ticks: { color: tickColor, font: { size: 12 } },
+                                grid: { display: false }
+                            }
+                        },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: ctx => ` ${ctx.parsed.x} ${invSorted[ctx.dataIndex]?.unidad || 'und'}`
+                                }
+                            },
+                            datalabels: {
+                                color: labelColor,
+                                anchor: 'end',
+                                align: 'right',
+                                font: { weight: '600', size: 12 },
+                                formatter: (value, ctx) => {
+                                    const u = invSorted[ctx.dataIndex]?.unidad || '';
+                                    return `${value} ${u}`;
+                                }
+                            }
+                        }
+                    }
+                });
+            }
 
         } else {
             showNotification(result.message, true);
@@ -1207,22 +1433,25 @@ async function loadServiceDemand() {
 
 // Auto-fill product details on sale
 document.addEventListener('DOMContentLoaded', () => {
+    // Load stylists list on page load
+    loadStylistsList();
+
     const saleProductoInput = document.getElementById('saleProducto');
     if (saleProductoInput) {
         saleProductoInput.addEventListener('input', function () {
             const val = this.value;
             if (currentInventory.length > 0) {
-                const item = currentInventory.find(i => i.Producto === val);
+                const item = currentInventory.find(i => i.producto === val);
                 if (item) {
                     const marcaInput = document.getElementById('saleMarca');
                     const descInput = document.getElementById('saleDescripcion');
-                    if (marcaInput) marcaInput.value = item.Marca || '';
-                    if (descInput) descInput.value = item.Descripcion || '';
+                    if (marcaInput) marcaInput.value = item.marca || '';
+                    if (descInput) descInput.value = item.descripcion || '';
 
                     // Also try to fill price if empty
                     const priceInput = document.querySelector('#productForm input[name="valor"]');
-                    if (priceInput && !priceInput.value && item.Valor) {
-                        priceInput.value = item.Valor;
+                    if (priceInput && !priceInput.value && item.valor) {
+                        priceInput.value = item.valor;
                     }
                 }
             }
@@ -1280,23 +1509,23 @@ async function loadAppointments() {
             result.data.forEach(item => {
                 const row = document.createElement('tr');
                 // Store item data in dataset for easy access
-                row.dataset.id = item.ID;
-                row.dataset.fecha = item.Fecha;
-                row.dataset.hora = item.Hora;
-                row.dataset.cliente = item.Cliente;
-                row.dataset.telefono = item.Telefono;
-                row.dataset.servicio = item.Servicio;
-                row.dataset.notas = item.Notas || '';
+                row.dataset.id = item.id;
+                row.dataset.fecha = item.fecha;
+                row.dataset.hora = item.hora;
+                row.dataset.cliente = item.cliente;
+                row.dataset.telefono = item.telefono;
+                row.dataset.servicio = item.servicio;
+                row.dataset.notas = item.notas || '';
 
                 row.innerHTML = `
-                    <td>${item.Hora}</td>
-                    <td>${item.Cliente}</td>
-                    <td>${item.Telefono}</td>
-                    <td>${item.Servicio}</td>
-                    <td>${item.Notas || ''}</td>
+                    <td>${item.hora}</td>
+                    <td>${item.cliente}</td>
+                    <td>${item.telefono}</td>
+                    <td>${item.servicio}</td>
+                    <td>${item.notas || ''}</td>
                     <td>
                         <button class="submit-btn" style="padding: 4px 8px; font-size: 0.8rem; margin-right: 5px;" onclick="editAppointment(this)">Editar</button>
-                        <button class="delete-btn" style="padding: 4px 8px; font-size: 0.8rem;" onclick="deleteAppointment('${item.ID}')">Eliminar</button>
+                        <button class="delete-btn" style="padding: 4px 8px; font-size: 0.8rem;" onclick="deleteAppointment('${item.id}')">Eliminar</button>
                     </td>
                 `;
                 tbody.appendChild(row);
@@ -1606,10 +1835,10 @@ async function loadMonthlyExpenses() {
             };
 
             result.data.forEach(item => {
-                const name = typeToName[item.Tipo];
+                const name = typeToName[item.tipo];
                 if (name) {
                     const input = form.querySelector(`[name="${name}"]`);
-                    if (input) input.value = item.Valor;
+                    if (input) input.value = item.valor;
                 }
             });
         }

@@ -1,11 +1,60 @@
+/* ===== MODO CLARO (default) ===== */
 :root {
     --primary-color: #00e1e9;
     --secondary-color: #0c58fc;
-    --bg-color: #ffffff;
+    --bg-color: #f0f4ff;
     --card-bg: rgba(255, 255, 255, 0.1);
     --text-color: #111111;
     --input-bg: rgba(189, 124, 233, 0.575);
     --border-color: rgba(15, 14, 14, 0.062);
+    /* Nuevas variables semánticas */
+    --heading-color: rgb(7, 3, 59);
+    --subtext-color: #36598a;
+    --label-color: #cbd5e1;
+    --table-text: #0f172a;
+    --table-header-text: #ffffff;
+    --stat-title-color: #1e3a5f;
+    --stat-value-color: #0f172a;
+    --solid-bg: #ffffff;
+    --solid-border: rgba(0, 0, 0, 0.08);
+    --transition-theme: background 0.4s ease, color 0.4s ease, border-color 0.4s ease;
+}
+
+/* ===== MODO OSCURO ===== */
+body.dark-mode {
+    --bg-color: #0b0f1a;
+    --card-bg: rgba(255, 255, 255, 0.04);
+    --text-color: #e2e8f0;
+    --input-bg: rgba(100, 60, 160, 0.35);
+    --border-color: rgba(255, 255, 255, 0.08);
+    --heading-color: #c7d2fe;
+    --subtext-color: #7c9cbf;
+    --label-color: #94a3b8;
+    --table-text: #e2e8f0;
+    --table-header-text: #e2e8f0;
+    --stat-title-color: #94a3b8;
+    --stat-value-color: #f1f5f9;
+    --solid-bg: #141927;
+    --solid-border: rgba(255, 255, 255, 0.07);
+}
+
+/* Aplicar transición global al cambiar tema */
+body,
+.container,
+.tabs,
+h2,
+h3,
+p,
+label,
+.summary-table,
+.table-container,
+.stat-card,
+.chart-wrapper,
+.input-group input,
+.input-group select,
+.notification,
+.stylist-item {
+    transition: var(--transition-theme);
 }
 
 * {
@@ -46,8 +95,8 @@ body {
 }
 
 .blob-1 {
-    width: 500px;
-    height: 500px;
+    width: 200px;
+    height: 200px;
     background: var(--primary-color);
     top: -100px;
     left: -100px;
@@ -103,13 +152,85 @@ body {
     /* Use remaining space minus small right margin */
     max-width: 1700px;
     margin: 40px 40px 40px 0;
-    /* Align to the left (sidebar space provided by body padding) */
-    background: var(--card-bg);
-    backdrop-filter: blur(20px);
     border-radius: 24px;
     padding: 40px;
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.685);
     border: 1px solid var(--border-color);
+    transition: background 0.4s ease, backdrop-filter 0.4s ease, box-shadow 0.4s ease;
+}
+
+/* Modo traslúcido (glass) */
+.container.container-glass {
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Modo sólido */
+.container.container-solid {
+    background: var(--solid-bg);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: 1px solid var(--solid-border);
+    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.18);
+}
+
+/* ---- Toggle Apariencia (sidebar) ---- */
+.appearance-toggle-wrap {
+    margin-bottom: 10px;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+}
+
+.appearance-toggle-label {
+    display: block;
+    font-size: 0.72rem;
+    color: var(--primary-color);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 8px;
+    text-align: center;
+}
+
+.appearance-toggle {
+    position: relative;
+    display: flex;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    padding: 3px;
+    cursor: pointer;
+    gap: 2px;
+    user-select: none;
+}
+
+.toggle-option {
+    flex: 1;
+    text-align: center;
+    padding: 6px 4px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: #94a3b8;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    position: relative;
+    z-index: 1;
+    white-space: nowrap;
+}
+
+.toggle-option.active {
+    color: #0f172a;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    box-shadow: 0 2px 8px rgba(0, 225, 233, 0.4);
+}
+
+.appearance-toggle:hover .toggle-option:not(.active) {
+    color: #cbd5e1;
 }
 
 /* Header */
@@ -297,7 +418,7 @@ header p {
 h2 {
     font-size: 1.25rem;
     margin-bottom: 20px;
-    color: rgb(7, 3, 59);
+    color: var(--heading-color);
 }
 
 .input-group {
@@ -307,7 +428,7 @@ h2 {
 .input-group label {
     display: block;
     margin-bottom: 8px;
-    color: #cbd5e1;
+    color: var(--label-color);
     font-size: 0.9rem;
 }
 
@@ -318,7 +439,7 @@ h2 {
     border: 1px solid var(--border-color);
     padding: 12px 16px;
     border-radius: 12px;
-    color: rgb(2, 14, 83);
+    color: var(--heading-color);
     font-size: 1rem;
     transition: all 0.3s ease;
 }
@@ -394,15 +515,15 @@ h2 {
     gap: 0.5rem;
     transition: transform 0.2s ease, box-shadow 0.3s ease;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
-                0 10px 15px -3px rgba(0, 0, 0, 0.1),
-                0 0 15px rgba(99, 236, 241, 0.1);
+        0 10px 15px -3px rgba(0, 0, 0, 0.1),
+        0 0 15px rgba(99, 236, 241, 0.1);
 }
 
 .subtotal-card:hover {
     transform: translateY(-2px);
     box-shadow: 0 8px 15px -3px rgba(0, 0, 0, 0.15),
-                0 12px 20px -5px rgba(99, 236, 241, 0.2),
-                0 0 25px rgba(99, 236, 241, 0.2);
+        0 12px 20px -5px rgba(99, 236, 241, 0.2),
+        0 0 25px rgba(99, 236, 241, 0.2);
 }
 
 .payment-method {
@@ -422,15 +543,15 @@ h2 {
 /* Sufficiency Card */
 .sufficiency-card {
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
-                0 10px 15px -3px rgba(0, 0, 0, 0.1),
-                0 0 15px rgba(99, 236, 241, 0.1);
+        0 10px 15px -3px rgba(0, 0, 0, 0.1),
+        0 0 15px rgba(99, 236, 241, 0.1);
     transition: box-shadow 0.3s ease;
 }
 
 .sufficiency-card:hover {
     box-shadow: 0 8px 15px -3px rgba(0, 0, 0, 0.15),
-                0 12px 20px -5px rgba(99, 236, 241, 0.2),
-                0 0 25px rgba(99, 236, 241, 0.2);
+        0 12px 20px -5px rgba(99, 236, 241, 0.2),
+        0 0 25px rgba(99, 236, 241, 0.2);
 }
 
 /* Table Styles */
@@ -611,15 +732,15 @@ h2 {
     gap: 0.5rem;
     transition: transform 0.2s ease, box-shadow 0.3s ease;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
-                0 10px 15px -3px rgba(0, 0, 0, 0.1),
-                0 0 15px rgba(99, 236, 241, 0.1);
+        0 10px 15px -3px rgba(0, 0, 0, 0.1),
+        0 0 15px rgba(99, 236, 241, 0.1);
 }
 
 .subtotal-card:hover {
     transform: translateY(-2px);
     box-shadow: 0 8px 15px -3px rgba(0, 0, 0, 0.15),
-                0 12px 20px -5px rgba(99, 236, 241, 0.2),
-                0 0 25px rgba(99, 236, 241, 0.2);
+        0 12px 20px -5px rgba(99, 236, 241, 0.2),
+        0 0 25px rgba(99, 236, 241, 0.2);
 }
 
 .payment-method {
@@ -639,15 +760,15 @@ h2 {
 /* Sufficiency Card */
 .sufficiency-card {
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
-                0 10px 15px -3px rgba(0, 0, 0, 0.1),
-                0 0 15px rgba(99, 236, 241, 0.1);
+        0 10px 15px -3px rgba(0, 0, 0, 0.1),
+        0 0 15px rgba(99, 236, 241, 0.1);
     transition: box-shadow 0.3s ease;
 }
 
 .sufficiency-card:hover {
     box-shadow: 0 8px 15px -3px rgba(0, 0, 0, 0.15),
-                0 12px 20px -5px rgba(99, 236, 241, 0.2),
-                0 0 25px rgba(99, 236, 241, 0.2);
+        0 12px 20px -5px rgba(99, 236, 241, 0.2),
+        0 0 25px rgba(99, 236, 241, 0.2);
 }
 
 /* Table Styles */
@@ -800,17 +921,17 @@ h2 {
     text-align: center;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
     box-shadow: 0 8px 16px -4px rgba(0, 0, 0, 0.15),
-                0 12px 24px -8px rgba(0, 0, 0, 0.12),
-                0 0 30px rgba(99, 236, 241, 0.2),
-                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        0 12px 24px -8px rgba(0, 0, 0, 0.12),
+        0 0 30px rgba(99, 236, 241, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .stat-card:hover {
     transform: translateY(-6px);
     box-shadow: 0 16px 32px -8px rgba(0, 0, 0, 0.2),
-                0 24px 48px -12px rgba(99, 236, 241, 0.35),
-                0 0 40px rgba(99, 236, 241, 0.3),
-                inset 0 1px 0 rgba(255, 255, 255, 0.15);
+        0 24px 48px -12px rgba(99, 236, 241, 0.35),
+        0 0 40px rgba(99, 236, 241, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
 .stat-card h3 {
@@ -837,17 +958,17 @@ h2 {
     padding: 1.5rem;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
     box-shadow: 0 8px 16px -4px rgba(0, 0, 0, 0.15),
-                0 12px 24px -8px rgba(0, 0, 0, 0.12),
-                0 0 30px rgba(99, 236, 241, 0.15),
-                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        0 12px 24px -8px rgba(0, 0, 0, 0.12),
+        0 0 30px rgba(99, 236, 241, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .chart-wrapper:hover {
     transform: translateY(-4px);
     box-shadow: 0 16px 32px -8px rgba(0, 0, 0, 0.2),
-                0 24px 48px -12px rgba(99, 236, 241, 0.3),
-                0 0 40px rgba(99, 236, 241, 0.25),
-                inset 0 1px 0 rgba(255, 255, 255, 0.15);
+        0 24px 48px -12px rgba(99, 236, 241, 0.3),
+        0 0 40px rgba(99, 236, 241, 0.25),
+        inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
 .chart-wrapper h3 {
@@ -1120,4 +1241,151 @@ h2 {
         width: 100%;
         text-align: center;
     }
+}
+
+/* ============================================================
+   DARK MODE — overrides para elementos con colores hardcodeados
+   ============================================================ */
+
+/* Fondo y texto general */
+body.dark-mode {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+}
+
+/* Header */
+body.dark-mode header p {
+    color: var(--subtext-color);
+}
+
+/* Tablas */
+body.dark-mode .summary-table {
+    color: var(--table-text);
+}
+
+body.dark-mode .summary-table th {
+    color: var(--table-header-text);
+    background: rgba(255, 255, 255, 0.07);
+}
+
+body.dark-mode .summary-table tfoot td,
+body.dark-mode .summary-table .profit-row td {
+    color: var(--table-text);
+}
+
+body.dark-mode .payment-total {
+    color: var(--table-text);
+}
+
+body.dark-mode .table-container {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+/* Stat cards */
+body.dark-mode .stat-card h3 {
+    color: var(--stat-title-color);
+}
+
+body.dark-mode .stat-value {
+    color: var(--stat-value-color);
+}
+
+body.dark-mode .stat-card {
+    background: rgba(99, 236, 241, 0.06);
+}
+
+/* Chart wrappers */
+body.dark-mode .chart-wrapper h3 {
+    color: var(--stat-title-color);
+}
+
+/* Filtros */
+body.dark-mode .filters-container select,
+body.dark-mode .filters-container input[type="date"] {
+    color: var(--text-color);
+    background: var(--input-bg);
+}
+
+/* Método de pago label */
+body.dark-mode .payment-method {
+    color: var(--subtext-color);
+}
+
+/* Blobs — más sutiles en dark para no quemar */
+body.dark-mode .blob {
+    opacity: 0.35;
+}
+
+/* Sidebar en dark — ya tiene fondo oscuro, se mantiene bien */
+body.dark-mode .tabs {
+    background: rgba(4, 10, 28, 0.88);
+}
+
+/* Inputs en dark */
+body.dark-mode .input-group input,
+body.dark-mode .input-group select {
+    color: var(--text-color);
+}
+
+body.dark-mode .input-group input::placeholder {
+    color: #64748b;
+}
+
+/* hr separadores */
+body.dark-mode hr {
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* h2 en modo sólido oscuro */
+body.dark-mode h2 {
+    color: var(--heading-color);
+}
+
+/* ----- Botón Toggle Dark Mode ----- */
+.darkmode-toggle-wrap {
+    margin-bottom: 10px;
+}
+
+.darkmode-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    transition: all 0.3s ease;
+    background: rgba(255, 255, 255, 0.06);
+    color: #e2e8f0;
+}
+
+.darkmode-btn:hover {
+    background: rgba(255, 255, 255, 0.13);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.darkmode-btn .dm-icon {
+    font-size: 1.1rem;
+    transition: transform 0.4s ease;
+}
+
+.darkmode-btn:hover .dm-icon {
+    transform: rotate(20deg) scale(1.15);
+}
+
+/* Estado activo: cuando está en dark mode */
+body.dark-mode .darkmode-btn {
+    background: rgba(12, 88, 252, 0.2);
+    border-color: rgba(12, 88, 252, 0.4);
+    color: #a5b4fc;
+}
+
+body.dark-mode .darkmode-btn:hover {
+    background: rgba(12, 88, 252, 0.35);
 }

@@ -3,6 +3,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import functools
 import pandas as pd
 import os
+import sys
 from datetime import datetime
 import sqlite3
 import json
@@ -12,12 +13,22 @@ from xhtml2pdf import pisa
 app = Flask(__name__)
 app.secret_key = 'magical_hair_secret_key_change_this_in_production'  # Required for session
 
-# Use relative path for database.db
-DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.db')
-STYLISTS_FILE = 'stylists.json'
-SERVICES_FILE = 'services.json'
-SEDES_FILE = 'sedes.json'
-USERS_FILE = 'users.json'
+def get_app_dir():
+    """Devuelve la carpeta donde reside el .exe (frozen) o el script (desarrollo)."""
+    if getattr(sys, 'frozen', False):
+        # Ejecutando como .exe compilado con PyInstaller
+        return os.path.dirname(sys.executable)
+    else:
+        # Ejecutando como script Python normal
+        return os.path.dirname(os.path.abspath(__file__))
+
+# Todos los archivos de datos se guardan SIEMPRE junto al exe / script
+APP_DIR = get_app_dir()
+DB_FILE       = os.path.join(APP_DIR, 'database.db')
+STYLISTS_FILE = os.path.join(APP_DIR, 'stylists.json')
+SERVICES_FILE = os.path.join(APP_DIR, 'services.json')
+SEDES_FILE    = os.path.join(APP_DIR, 'sedes.json')
+USERS_FILE    = os.path.join(APP_DIR, 'users.json')
 
 @app.errorhandler(500)
 def internal_error(error):
@@ -148,7 +159,8 @@ def init_db():
                     servicio TEXT,
                     valor REAL,
                     comision REAL,
-                    metodo_pago TEXT
+                    metodo_pago TEXT,
+                    cliente TEXT
                 );''')
                 
     # Productos
@@ -162,7 +174,8 @@ def init_db():
                     descripcion TEXT,
                     valor REAL,
                     comision REAL,
-                    metodo_pago TEXT
+                    metodo_pago TEXT,
+                    cliente TEXT
                 );''')
 
     # Gastos
@@ -219,13 +232,19 @@ def init_db():
 def get_stylists():
     try:
         with open(STYLISTS_FILE, 'r') as f:
-            return json.load(f)
+            data = json.load(f)
+            # Migration: if list of strings, convert to objects with default commission
+            if data and isinstance(data[0], str):
+                new_data = [{'name': s, 'commission': 50, 'special_commission': 50} for s in data]
+                save_stylists(new_data)
+                return new_data
+            return data
     except:
         return []
 
 def save_stylists(stylists):
     with open(STYLISTS_FILE, 'w') as f:
-        json.dump(stylists, f)
+        json.dump(stylists, f, indent=2)
 
 def get_services():
     try:
@@ -283,9 +302,10 @@ def insert_record(table, data):
 @login_required
 def index():
     stylists = get_stylists()
+    stylist_names = [s['name'] for s in stylists]  # Extract only names for dropdowns
     services = get_services()
     sedes = get_sedes()
-    return render_template('index.html', stylists=stylists, services=services, sedes=sedes)
+    return render_template('index.html', stylists=stylist_names, services=services, sedes=sedes)
 
 @app.route('/certificado')
 @login_required
@@ -296,9 +316,10 @@ def view_certificate():
 @login_required
 def admin_panel():
     stylists = get_stylists()
+    stylist_names = [s['name'] for s in stylists]  # Extract only names for dropdowns
     sedes = get_sedes()
     services = get_services()
-    return render_template('admin.html', stylists=stylists, sedes=sedes, services=services)
+    return render_template('admin.html', stylists=stylist_names, sedes=sedes, services=services)
 
 @app.route('/certificado/descargar')
 @login_required
@@ -330,18 +351,54 @@ def download_certificate_pdf():
     except Exception as e:
         return str(e), 500
 
+@app.route('/api/stylists', methods=['GET'])
+@login_required
+def get_stylists_list():
+    try:
+        stylists = get_stylists()
+        return jsonify({'status': 'success', 'data': stylists})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 @app.route('/api/stylist', methods=['POST'])
 @login_required
 def add_stylist():
     data = request.json
     new_stylist = data.get('name')
+    commission = float(data.get('commission', 50))
+    special_commission = float(data.get('special_commission', 50))
     if new_stylist:
         stylists = get_stylists()
-        if new_stylist not in stylists:
-            stylists.append(new_stylist)
+        if not any(s['name'] == new_stylist for s in stylists):
+            stylists.append({
+                'name': new_stylist,
+                'commission': commission,
+                'special_commission': special_commission
+            })
             save_stylists(stylists)
             return jsonify({'status': 'success', 'message': 'Estilista agregado'})
         return jsonify({'status': 'error', 'message': 'El estilista ya existe'})
+    return jsonify({'status': 'error', 'message': 'Nombre inválido'})
+
+@app.route('/api/stylist', methods=['PUT'])
+@login_required
+def update_stylist():
+    data = request.json
+    name = data.get('name')
+    commission = data.get('commission')
+    special_commission = data.get('special_commission')
+    
+    if name:
+        stylists = get_stylists()
+        for stylist in stylists:
+            if stylist['name'] == name:
+                if commission is not None:
+                    stylist['commission'] = float(commission)
+                if special_commission is not None:
+                    stylist['special_commission'] = float(special_commission)
+                save_stylists(stylists)
+                return jsonify({'status': 'success', 'message': 'Estilista actualizado'})
+        return jsonify({'status': 'error', 'message': 'Estilista no encontrado'})
     return jsonify({'status': 'error', 'message': 'Nombre inválido'})
 
 @app.route('/api/stylist', methods=['DELETE'])
@@ -350,10 +407,11 @@ def delete_stylist():
     data = request.json
     name_to_delete = data.get('name')
     stylists = get_stylists()
-    if name_to_delete in stylists:
-        stylists.remove(name_to_delete)
-        save_stylists(stylists)
-        return jsonify({'status': 'success', 'message': 'Estilista eliminado'})
+    for i, s in enumerate(stylists):
+        if s['name'] == name_to_delete:
+            stylists.pop(i)
+            save_stylists(stylists)
+            return jsonify({'status': 'success', 'message': 'Estilista eliminado'})
     return jsonify({'status': 'error', 'message': 'Estilista no encontrado'})
 
 @app.route('/api/service-item', methods=['POST'])
@@ -371,6 +429,33 @@ def add_service_item():
             save_services(services)
             return jsonify({'status': 'success', 'message': 'Servicio agregado'})
         return jsonify({'status': 'error', 'message': 'El servicio ya existe'})
+    return jsonify({'status': 'error', 'message': 'Nombre inválido'})
+
+@app.route('/api/services', methods=['GET'])
+@login_required
+def get_services_list():
+    try:
+        services = get_services()
+        return jsonify({'status': 'success', 'data': services})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/service-item', methods=['PUT'])
+@login_required
+def update_service_item():
+    data = request.json
+    name = data.get('name')
+    value = data.get('value')
+    
+    if name:
+        services = get_services()
+        for service in services:
+            if service['name'] == name:
+                if value is not None:
+                    service['value'] = float(value)
+                save_services(services)
+                return jsonify({'status': 'success', 'message': 'Servicio actualizado'})
+        return jsonify({'status': 'error', 'message': 'Servicio no encontrado'})
     return jsonify({'status': 'error', 'message': 'Nombre inválido'})
 
 @app.route('/api/service-item', methods=['DELETE'])
@@ -426,16 +511,17 @@ def calculate_commission(stylist, service, value):
     service_lower = service.lower()
     is_special_service = 'tinte' in service_lower or 'mechas' in service_lower or 'keratina' in service_lower
     
-    if 'monica' in stylist.lower():
-        if is_special_service:
-            return value * 0.50
-        return value * 0.40
+    # Get stylist commission from config
+    stylists = get_stylists()
+    stylist_config = next((s for s in stylists if s['name'].lower() == stylist.lower()), None)
     
-    if 'elizabeth' in stylist.lower():
+    if stylist_config:
         if is_special_service:
-            return value * 0.60
-        return value * 0.50
-        
+            commission_rate = float(stylist_config.get('special_commission', 50)) / 100
+        else:
+            commission_rate = float(stylist_config.get('commission', 50)) / 100
+        return value * commission_rate
+    
     # Default for others
     return value * 0.50
 
@@ -1566,7 +1652,11 @@ def admin_get_records(table_name):
             where_clauses.append("sede = ?")
             params.append(sede)
         if fecha:
-            where_clauses.append("date(fecha) = ?")
+            # Use fecha_actualizacion for inventario table, fecha for others
+            if table_name == 'inventario':
+                where_clauses.append("date(fecha_actualizacion) = ?")
+            else:
+                where_clauses.append("date(fecha) = ?")
             params.append(fecha)
             
         if where_clauses:
@@ -1582,13 +1672,31 @@ def admin_get_records(table_name):
         df = pd.read_sql(query, conn, params=params)
         conn.close()
         
+        # Replace NaN/None values with None (null in JSON)
+        # First convert all NaN to None
+        df = df.astype(object).where(pd.notna(df), None)
+        
+        # Convert DataFrame to list of dicts and handle any remaining NaN values
+        data = df.to_dict(orient='records')
+        
+        # Final safety check to replace any NaN values
+        def replace_nan(obj):
+            if isinstance(obj, dict):
+                return {k: (None if (isinstance(v, float) and pd.isna(v)) else v) for k, v in obj.items()}
+            return obj
+        
+        data = [replace_nan(record) for record in data]
+        
         return jsonify({
             'status': 'success', 
-            'data': df.to_dict(orient='records'),
+            'data': data,
             'columns': list(df.columns)
         })
     except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        print(f"Error in admin_get_records: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': f'Error al cargar datos: {str(e)}'}), 500
 
 @app.route('/api/admin/<table_name>/<id>', methods=['GET'])
 @login_required

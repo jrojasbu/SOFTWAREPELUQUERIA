@@ -9,15 +9,29 @@ def open_browser():
 
 if __name__ == '__main__':
     try:
-        # Si se ejecuta como exe compilado, cambiar el directorio de trabajo al temporal
+        # ── Establecer el directorio de trabajo en la carpeta del exe/script ──
+        # Esto garantiza que database.db y los .json siempre se lean/escriban
+        # en la misma carpeta que el ejecutable, sin importar desde dónde se lance.
         if getattr(sys, 'frozen', False):
+            # Modo compilado (.exe)
+            app_dir = os.path.dirname(sys.executable)
             template_folder = os.path.join(sys._MEIPASS, 'templates')
             static_folder = os.path.join(sys._MEIPASS, 'static')
             app.template_folder = template_folder
             app.static_folder = static_folder
             print(f"Running in frozen mode.")
+            print(f"Executable folder: {app_dir}")
             print(f"Templates: {template_folder}")
             print(f"Static: {static_folder}")
+        else:
+            # Modo script Python normal
+            app_dir = os.path.dirname(os.path.abspath(__file__))
+            print(f"Running in script mode.")
+            print(f"Script folder: {app_dir}")
+
+        # Cambiar el directorio de trabajo a la carpeta del exe/script
+        os.chdir(app_dir)
+        print(f"Working directory set to: {app_dir}")
 
         # Inicializar base de datos
         print("Initializing database...")
