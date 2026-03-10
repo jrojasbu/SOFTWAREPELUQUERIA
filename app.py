@@ -11,7 +11,7 @@ from io import BytesIO
 from xhtml2pdf import pisa
 
 app = Flask(__name__)
-app.secret_key = 'magical_hair_secret_key_change_this_in_production'  # Required for session
+app.secret_key = os.environ.get('SECRET_KEY', 'magical_hair_default_secret_key_for_dev_only')  # Required for session
 
 def get_app_dir():
     """Devuelve la carpeta donde reside el .exe (frozen) o el script (desarrollo)."""
@@ -916,16 +916,24 @@ def export_pdf():
         
         utilidad = total_valor - total_gastos - total_comision
         
+        # Ruta del logo
+        logo_path = os.path.join(APP_DIR, 'Logo', 'Magical_Hair.png')
+        if not os.path.exists(logo_path):
+            logo_path = None
+        
         context = {
             'date': date_filter,
             'sede': sede_filter,
+            'data': summary_data,
             'summary': summary_data,
+            'logo_path': logo_path,
             'totals': {
                 'valor': total_valor,
                 'comision': total_comision,
                 'gastos': total_gastos,
                 'utilidad': utilidad
-            }
+            },
+            'generation_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }
         
         pdf = render_pdf('pdf_report.html', context)
@@ -1774,6 +1782,10 @@ def admin_delete_record(table_name, id):
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+# Inicializar la base de datos al importar el módulo (idempotente)
+init_db()
+
 if __name__ == '__main__':
-    init_db()
-    app.run(host='0.0.0.0', debug=True)
+    # Usar el puerto definido por el entorno (Cloud Run usa PORT)
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port, debug=True)

@@ -1,21 +1,34 @@
-# Use the official lightweight Python image.
+# Usar la imagen oficial liviana de Python.
 # https://hub.docker.com/_/python
 FROM python:3.9-slim
 
-# Allow statements and log messages to immediately appear in the Knative logs
+# Permitir que los mensajes de log aparezcan inmediatamente en los registros de Knative
 ENV PYTHONUNBUFFERED True
 
-# Copy local code to the container image.
+# Configurar el directorio de trabajo
 ENV APP_HOME /app
 WORKDIR $APP_HOME
-COPY . ./
 
-# Install production dependencies.
+# Instalar dependencias de sistema necesarias para xhtml2pdf y procesamiento de imágenes (Pillow)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpangocairo-1.0-0 \
+    libjpeg-dev \
+    zlib1g-dev \
+    libpng-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copiar el archivo de dependencias e instalarlas
+COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Run the web service on container startup. Here we use the gunicorn
-# webserver, with one worker process and 8 threads.
-# For environments with multiple CPU cores, increase the number of workers
-# to be equal to the cores available.
-# Timeout is set to 0 to disable the timeouts of the workers to allow Cloud Run to handle instance scaling.
-CMD exec gunicorn --bind :$PORT --workers 1 --threads 8 --timeout 0 app:app
+# Copiar el código local a la imagen del contenedor
+COPY . ./
+
+# Puerto expuesto por defecto para documentación (Cloud Run inyectará el valor real en $PORT)
+EXPOSE 8080
+
+# Ejecutar el servicio web al iniciar el contenedor. Usamos gunicorn
+# con un proceso worker y 8 hilos.
+# Para entornos con múltiples núcleos, se puede aumentar el número de workers.
+# Timeout se pone en 0 para dejar que Cloud Run maneje el escalado de instancias.
+CMD exec gunicorn --bind :${PORT:-8080} --workers 1 --threads 8 --timeout 0 app:app

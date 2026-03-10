@@ -23,6 +23,7 @@
             font-family: Helvetica, sans-serif;
             font-size: 10pt;
             color: #333;
+            line-height: 1;
         }
 
         .header {
@@ -34,7 +35,8 @@
         }
 
         .logo {
-            width: 150px;
+            width: 120px;
+            height: auto;
             vertical-align: middle;
         }
 
@@ -70,13 +72,15 @@
             color: #d4af37;
             font-weight: bold;
             text-align: left;
-            padding: 8px;
+            padding: 5px;
             border-bottom: 1px solid #ddd;
+            line-height: 1;
         }
 
         td {
-            padding: 8px;
+            padding: 4px;
             border-bottom: 1px solid #eee;
+            line-height: 1;
         }
 
         .total-section {
@@ -91,8 +95,9 @@
         }
 
         .total-table td {
-            padding: 10px;
+            padding: 6px;
             border-bottom: 1px solid #ddd;
+            line-height: 1;
         }
 
         .total-label {
@@ -120,16 +125,16 @@
 
 <body>
     <div class="header">
-        <table>
-            <tr>
-                <td>
+        <table style="width: 100%; border: none;">
+            <tr style="border: none;">
+                <td style="border: none; width: 20%; vertical-align: middle; padding: 0;">
                     {% if logo_path %}
-                    <img src="{{ logo_path }}" class="logo" alt="Logo">
+                    <img src="file:///{{ logo_path | replace('\\', '/') }}" class="logo" alt="Logo">
                     {% else %}
                     <h2>Magical Hair</h2>
                     {% endif %}
                 </td>
-                <td class="company-info">
+                <td class="company-info" style="border: none;">
                     <strong>Magical Hair</strong><br>
                     Reporte de Cierre Diario
                 </td>
