@@ -15,6 +15,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libjpeg-dev \
     zlib1g-dev \
     libpng-dev \
+    libffi-dev \
+    libcairo2 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copiar el archivo de dependencias e instalarlas
