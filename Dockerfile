@@ -11,12 +11,16 @@ WORKDIR $APP_HOME
 
 # Instalar dependencias de sistema necesarias para xhtml2pdf y procesamiento de imágenes (Pillow)
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \    
+    gcc \
+    libcairo2 \
+    libcairo2-dev \
+    pkg-config \   
     libpangocairo-1.0-0 \
     libjpeg-dev \
     zlib1g-dev \
     libpng-dev \
     libffi-dev \
-    libcairo2 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copiar el archivo de dependencias e instalarlas
